@@ -4,9 +4,11 @@
 <dict>
     <key>Label</key>
     <string>com.tree.recovery</string>
+    <key>UserName</key>
+    <string>joelgerard</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/python3</string>
+        <string>/Users/joelgerard/dev/git/tree_health/venv/bin/python3</string>
         <string>/Users/joelgerard/dev/git/tree_health/app.py</string>
     </array>
     <key>RunAtLoad</key>

@@ -7,11 +7,11 @@ from flask import Flask, render_template, jsonify, request
 app = Flask(__name__)
 
 # Configuration
-DB_DIR = os.path.expanduser("~/HealthData/DBs/")
+DB_DIR = os.path.expanduser("/Users/joelgerard/tree_home/HealthData/DBs")
 GARMIN_DB = os.path.join(DB_DIR, "garmin.db")
 GARMIN_ACTIVITIES_DB = os.path.join(DB_DIR, "garmin_activities.db")
 GARMIN_HRV_DB = os.path.join(DB_DIR, "garmin_hrv.db")
-SYNC_SCRIPT = os.path.expanduser("~/HealthData/scripts/sync_garmin.sh")
+SYNC_SCRIPT = os.path.expanduser("/Users/joelgerard/tree_home/export_garmin.sh")
 
 def get_db_connection(db_path):
     conn = sqlite3.connect(db_path)
