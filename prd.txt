@@ -1,0 +1,275 @@
+
+**Role:** You are a Senior Python Engineer and System Architect.
+
+**Objective:** Build a local "Recovery Dashboard" web application for a user recovering from Long Covid. The app will run locally on a Mac, launch on startup, and serve as a daily "Go/No-Go" gauge based on biometric data.
+
+**Context:** The user has SQLite databases containing health data (Garmin). The user has a bash script that pulls fresh data from the Garmin API. The web app must manage the data sync and visualize specific "crash prediction" metrics.
+
+### **Technical Stack**
+
+1. **Backend:** Python (Flask).
+2. **Frontend:** HTML/CSS (Bootstrap 5 for simplicity), HTMX (for polling the download status without page reloads).
+3. **Visualization:** Plotly (for interactive trend charts).
+4. **Database:** SQLite (Reading existing files).
+5. **OS:** macOS (requires a `launchd` plist for startup).
+
+### **Data Source**
+
+The app will read from two SQLite databases located at `~/HealthData/DBs/` or a
+directory as configured in the config file:
+
+1. `garmin.db` (Tables: `daily_summary`, `sleep`, `resting_hr`, `hrv_data`)
+2. `garmin_activities.db` (Table: `activities`)
+
+**Schema Definitions:**
+[Insert the CREATE TABLE SQL schemas provided above here]
+
+---
+
+### **Core Functionality Requirements**
+
+#### **1. Data Freshness & Sync Logic**
+
+* **On Homepage Load:** Check the `daily_summary` table.
+* **Logic:**
+* If the latest `day` in `daily_summary` is **today** (or "yesterday" if it's early morning and sync hasn't happened), show the Dashboard.
+* If data is stale, automatically trigger a background process.
+
+
+* **Background Process:**
+* Execute a bash script located at `~/HealthData/scripts/sync_garmin.sh` (assume this script exists).
+* **UI:** Show a progress bar or spinner saying "Fetching latest biometrics..."
+* Once the script finishes, reload the page to show the Dashboard.
+
+
+
+#### **2. The "Recovery Algorithm" (The Dashboard)**
+
+The dashboard needs a "Morning Briefing" section. It must query the DB and apply the following **Strict Logic rules** to generate a recommendation.
+
+* **Metric 1: The Crash Predictor (Lag 2 Analysis)**
+* Query `steps` and `vigorous_activity_time` from **2 days ago**.
+* *Rule:* If Steps (T-2) > 5,500 OR Vigorous Minutes (T-2) > 20:
+* *Output:* "⚠️ High Risk: delayed fatigue from 2 days ago."
+
+
+* **Metric 2: The Safety Ceiling (Yesterday's Load)**
+* Query `steps` from **Yesterday**.
+* *Rule:* If Steps (T-1) > 4,500:
+* *Output:* "⚠️ Warning: You exceeded the safety cap yesterday."
+
+
+* **Metric 3: Autonomic Stress (Today's Vitals)**
+* Query `overnight_hrv` (last night) and `resting_heart_rate` (yesterday/today).
+* *Rule:* If RHR > 53 bpm OR HRV < [7-day-avg minus 5ms]:
+* *Output:* "❤️ Physiological Stress detected."
+
+
+* **Metric 4: Sleep Recharge**
+* Query `bb_charged` (Body Battery Charged) from `daily_summary`.
+* *Rule:* If `bb_charged` < 50:
+* *Output:* "🔋 Poor Recharge."
+
+
+
+**The Final Verdict (UI Display):**
+
+* **GREEN Light:** If 0 warnings. -> "✅ **Safe to proceed.** Target: 4,500 Steps."
+* **YELLOW Light:** If 1 warning. -> "⚠️ **Caution.** Limit Activity. Target: 3,000 Steps."
+* **RED Light:** If 2+ warnings or High RHR. -> "🛑 **STOP.** Rest Day. Target: <1,500 Steps."
+
+#### **3. Visualization (Trend Analysis)**
+
+Display a Plotly chart showing a **14-Day Rolling View**:
+
+* **X-Axis:** Date.
+* **Y-Axis (Left):** Daily Steps (Bar chart).
+* **Y-Axis (Right):** Resting Heart Rate (Line chart).
+* **Annotation:** Draw a horizontal red line at **4,500 steps** labeled "Safety Ceiling."
+
+---
+
+### **Deliverables Needed**
+
+1. **`app.py`:** The complete Flask application code.
+* Must handle time conversion (e.g., converting "00:34:00" string to minutes).
+* Must use `subprocess` to run the bash script.
+
+
+2. **`templates/index.html`:** The dashboard template using Bootstrap.
+3. **`com.tree.recovery.plist`:** The macOS launchd file to start the app on login.
+* Assume user is `tree`.
+* Run on Port `5050`.
+
+
+4. **`requirements.txt`:** List of python packages.
+5. **Setup Instructions:** Brief command-line steps to install requirements, place the plist file, and start the service.
+
+**Important Implementation Note:**
+When writing the SQL queries in Python, ensure you order by date descending and limit to the appropriate range (last 3 days for analysis, last 14 days for charts). Handle cases where data might be `NULL`.
+
+These are the tables
+
+----------------------------------------------------------------------
+Here are some tables in ~/HealthData/DBs/garmin_activities.db.
+----------------------------------------------------------------------
+
+CREATE TABLE activities (
+	activity_id VARCHAR NOT NULL, 
+	name VARCHAR, 
+	description VARCHAR, 
+	type VARCHAR, 
+	course_id INTEGER, 
+	laps INTEGER, 
+	sport VARCHAR, 
+	sub_sport VARCHAR, 
+	device_serial_number INTEGER, 
+	self_eval_feel VARCHAR, 
+	self_eval_effort VARCHAR, 
+	training_load FLOAT, 
+	training_effect FLOAT, 
+	anaerobic_training_effect FLOAT, 
+	start_time DATETIME, 
+	stop_time DATETIME, 
+	elapsed_time TIME NOT NULL, 
+	moving_time TIME NOT NULL, 
+	distance FLOAT, 
+	cycles FLOAT, 
+	avg_hr INTEGER, 
+	max_hr INTEGER, 
+	avg_rr FLOAT, 
+	max_rr FLOAT, 
+	calories INTEGER, 
+	avg_cadence INTEGER, 
+	max_cadence INTEGER, 
+	avg_speed FLOAT, 
+	max_speed FLOAT, 
+	ascent FLOAT, 
+	descent FLOAT, 
+	max_temperature FLOAT, 
+	min_temperature FLOAT, 
+	avg_temperature FLOAT, 
+	start_lat FLOAT, 
+	start_long FLOAT, 
+	stop_lat FLOAT, 
+	stop_long FLOAT, 
+	hr_zones_method VARCHAR(18), 
+	hrz_1_hr INTEGER, 
+	hrz_2_hr INTEGER, 
+	hrz_3_hr INTEGER, 
+	hrz_4_hr INTEGER, 
+	hrz_5_hr INTEGER, 
+	hrz_1_time TIME NOT NULL, 
+	hrz_2_time TIME NOT NULL, 
+	hrz_3_time TIME NOT NULL, 
+	hrz_4_time TIME NOT NULL, 
+	hrz_5_time TIME NOT NULL, 
+	PRIMARY KEY (activity_id)
+);
+
+CREATE TABLE activity_records (
+	activity_id VARCHAR NOT NULL, 
+	record INTEGER NOT NULL, 
+	timestamp DATETIME, 
+	position_lat FLOAT, 
+	position_long FLOAT, 
+	distance FLOAT, 
+	cadence INTEGER, 
+	altitude FLOAT, 
+	hr INTEGER, 
+	rr FLOAT, 
+	speed FLOAT, 
+	temperature FLOAT, 
+	PRIMARY KEY (activity_id, record), 
+	FOREIGN KEY(activity_id) REFERENCES activities (activity_id)
+);
+
+----------------------------------------------------------------------
+Here are some tables in ~/HealthData/DBs/garmin.db.
+----------------------------------------------------------------------
+CREATE TABLE daily_summary (
+	day DATE NOT NULL, 
+	hr_min INTEGER, 
+	hr_max INTEGER, 
+	rhr INTEGER, 
+	stress_avg INTEGER, 
+	step_goal INTEGER, 
+	steps INTEGER, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	floors_up FLOAT, 
+	floors_down FLOAT, 
+	floors_goal FLOAT, 
+	distance FLOAT, 
+	calories_goal INTEGER, 
+	calories_total INTEGER, 
+	calories_bmr INTEGER, 
+	calories_active INTEGER, 
+	calories_consumed INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_charged INTEGER, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	description VARCHAR, 
+	PRIMARY KEY (day)
+);
+
+CREATE TABLE sleep (
+	day DATE NOT NULL, 
+	start DATETIME, 
+	"end" DATETIME, 
+	total_sleep TIME NOT NULL, 
+	deep_sleep TIME NOT NULL, 
+	light_sleep TIME NOT NULL, 
+	rem_sleep TIME NOT NULL, 
+	awake TIME NOT NULL, 
+	avg_spo2 FLOAT, 
+	avg_rr FLOAT, 
+	avg_stress FLOAT, 
+	score INTEGER, 
+	qualifier VARCHAR, 
+	PRIMARY KEY (day)
+);
+
+CREATE TABLE sleep_events (
+	timestamp DATETIME NOT NULL, 
+	event VARCHAR, 
+	duration TIME NOT NULL, 
+	PRIMARY KEY (timestamp)
+);
+
+CREATE TABLE stress (
+	timestamp DATETIME NOT NULL, 
+	stress INTEGER NOT NULL, 
+	PRIMARY KEY (timestamp), 
+	UNIQUE (timestamp)
+);
+
+CREATE TABLE resting_hr (
+	day DATE NOT NULL, 
+	resting_heart_rate FLOAT, 
+	PRIMARY KEY (day)
+);
+
+CREATE TABLE weight (
+	day DATE NOT NULL, 
+	weight FLOAT NOT NULL, 
+	PRIMARY KEY (day)
+);
+
+HRV data
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| `date` | TEXT | Primary Key (YYYY-MM-DD) |
+| `overnight_hrv` | INTEGER | The nightly HRV value in ms |
+| `baseline_low` | INTEGER | Lower bound of baseline range |
+| `baseline_high` | INTEGER | Upper bound of baseline range |
+| `seven_day_avg` | INTEGER | 7-day trailing average |

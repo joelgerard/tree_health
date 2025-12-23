@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recovery Dashboard</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <!-- Plotly -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    
+    <style>
+        :root {
+            --glass-bg: rgba(20, 20, 30, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --card-bg: rgba(30, 30, 40, 0.6);
+            --accent-green: #00d26a;
+            --accent-yellow: #ffc107;
+            --accent-red: #ff4d4d;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .metric-card {
+            background: var(--card-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .status-GREEN { background-color: var(--accent-green); box-shadow: 0 0 10px var(--accent-green); }
+        .status-YELLOW { background-color: var(--accent-yellow); box-shadow: 0 0 10px var(--accent-yellow); }
+        .status-RED { background-color: var(--accent-red); box-shadow: 0 0 10px var(--accent-red); }
+
+        .verdict-large {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .text-GREEN { color: var(--accent-green) !important; }
+        .text-YELLOW { color: var(--accent-yellow) !important; }
+        .text-RED { color: var(--accent-red) !important; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 4px;
+        }
+        
+        .loader {
+            display: none;
+        }
+        .htmx-request .loader {
+            display: inline-block;
+        }
+    </style>
+</head>
+<body class="py-4">
+    <div class="container">
+        <!-- Header Section -->
+        <header class="mb-5 glass-panel p-4 position-relative overflow-hidden">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div>
+                    <h6 class="text-uppercase text-secondary mb-1 letter-spacing-2">Recovery Dashboard</h6>
+                    <h1 class="display-5 fw-bold mb-0">Daily Briefing</h1>
+                    <p class="mb-0 text-secondary mt-2">
+                        Data Status: 
+                        {% if fresh %}
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3">
+                            <i class="bi bi-check-circle-fill me-1"></i> Up to Date
+                        </span>
+                        {% else %}
+                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-3">
+                             Stale - Sync Needed
+                        </span>
+                        {% endif %}
+                    </p>
+                </div>
+                
+                <div class="d-flex align-items-center gap-3">
+                    {% if not fresh %}
+                    <button class="btn btn-primary px-4 py-2 rounded-pill d-flex align-items-center gap-2"
+                            hx-post="/sync" 
+                            hx-swap="none"
+                            onclick="location.reload()" 
+                            style="background-color: #4a6fa5; border: none;">
+                        <span class="loader spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        <span>Sync Now</span>
+                    </button>
+                    <!-- Note: Implementation for proper sync feedback (progress bar) would need a bit more JS or SSE, 
+                         for simplicity we reload or rely on backend to finish before return. 
+                         Button implementation above assumes sync is synchronous (app.py uses subprocess.run check=True). 
+                         If check=True it waits. 
+                         Actually hx-post will wait for response. 
+                         We can just reload page after response.
+                         Let's improve this: hx-target="body" ?? No.
+                         Let's simple verify: hx-post="/sync" -> on htmx:afterRequest -> reload.
+                    -->
+                    <script>
+                        document.body.addEventListener('htmx:afterRequest', function(evt) {
+                            if(evt.detail.elt.getAttribute('hx-post') === '/sync') {
+                                if(evt.detail.successful) {
+                                    window.location.reload();
+                                } else {
+                                    alert('Sync failed!');
+                                }
+                            }
+                        });
+                    </script>
+                    {% endif %}
+                    
+                    <div class="text-end glass-panel p-3 px-4" style="background: rgba(0,0,0,0.2);">
+                         <div class="text-secondary small text-uppercase">Today's Target</div>
+                         <div class="h2 mb-0 fw-bold {{ 'text-' + metrics.final_verdict.status }}">{{ metrics.final_verdict.target }}</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Morning Briefing Grid -->
+        <h5 class="text-secondary mb-3 ps-2">Physiological Status</h5>
+        <div class="row g-4 mb-5">
+            <!-- Metric 1: Crash Predictor -->
+            <div class="col-md-6 col-lg-3">
+                <div class="metric-card p-4 h-100 position-relative">
+                    <div class="d-flex justify-content-between mb-3">
+                        <small class="text-secondary">Crash Predictor (T-2)</small>
+                        <div class="status-indicator status-{{ metrics.crash_predictor.status }}"></div>
+                    </div>
+                    <h5 class="card-title fw-normal mb-1 {{ 'text-' + metrics.crash_predictor.status }}">
+                        {{ metrics.crash_predictor.msg }}
+                    </h5>
+                    <p class="text-secondary small mt-2 mb-0">Lag 2 Analysis</p>
+                </div>
+            </div>
+
+            <!-- Metric 2: Safety Ceiling -->
+            <div class="col-md-6 col-lg-3">
+                <div class="metric-card p-4 h-100">
+                    <div class="d-flex justify-content-between mb-3">
+                        <small class="text-secondary">Safety Ceiling (T-1)</small>
+                        <div class="status-indicator status-{{ metrics.safety_ceiling.status }}"></div>
+                    </div>
+                    <h5 class="card-title fw-normal mb-1 {{ 'text-' + metrics.safety_ceiling.status }}">
+                         {{ metrics.safety_ceiling.msg }}
+                    </h5>
+                    <p class="text-secondary small mt-2 mb-0">Yesterday's Load</p>
+                </div>
+            </div>
+
+            <!-- Metric 3: Autonomic Stress -->
+            <div class="col-md-6 col-lg-3">
+                <div class="metric-card p-4 h-100">
+                    <div class="d-flex justify-content-between mb-3">
+                        <small class="text-secondary">Autonomic Stress</small>
+                        <div class="status-indicator status-{{ metrics.autonomic_stress.status }}"></div>
+                    </div>
+                    <h5 class="card-title fw-normal mb-1 {{ 'text-' + metrics.autonomic_stress.status }}">
+                         {{ metrics.autonomic_stress.msg }}
+                    </h5>
+                    <p class="text-secondary small mt-2 mb-0">RHR & HRV Analysis</p>
+                </div>
+            </div>
+
+            <!-- Metric 4: Sleep Recharge -->
+            <div class="col-md-6 col-lg-3">
+                <div class="metric-card p-4 h-100">
+                    <div class="d-flex justify-content-between mb-3">
+                        <small class="text-secondary">Sleep Recharge</small>
+                        <div class="status-indicator status-{{ metrics.sleep_recharge.status }}"></div>
+                    </div>
+                    <h5 class="card-title fw-normal mb-1 {{ 'text-' + metrics.sleep_recharge.status }}">
+                         {{ metrics.sleep_recharge.msg }}
+                    </h5>
+                    {% if metrics.today_data_available %}
+                    <p class="text-secondary small mt-2 mb-0">Body Battery</p>
+                    {% else %}
+                    <p class="text-warning small mt-2 mb-0">No Data for Today</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Verdict Banner -->
+        <div class="glass-panel p-4 mb-5 text-center position-relative overflow-hidden" 
+             style="border-color: var(--accent-{{ metrics.final_verdict.status }}); border-width: 1px; box-shadow: 0 0 20px rgba(0,0,0,0.2);">
+            <div class="position-absolute top-0 start-0 w-100 h-100" 
+                 style="background: radial-gradient(circle at center, var(--accent-{{ metrics.final_verdict.status }}), transparent 70%); opacity: 0.1;"></div>
+            <h2 class="verdict-large mb-0 {{ 'text-' + metrics.final_verdict.status }}">
+                {{ metrics.final_verdict.msg }}
+            </h2>
+        </div>
+
+        <!-- Trend Analysis -->
+        <h5 class="text-secondary mb-3 ps-2">14-Day Trend Analysis</h5>
+        <div class="glass-panel p-4">
+            <div id="trendChart" style="width:100%; height:400px;"></div>
+        </div>
+    </div>
+
+    <!-- Chart Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('/api/data')
+                .then(response => response.json())
+                .then(data => {
+                    const traceSteps = {
+                        x: data.dates,
+                        y: data.steps,
+                        name: 'Steps',
+                        type: 'bar',
+                        marker: {
+                            color: 'rgba(54, 162, 235, 0.6)',
+                            line: { color: 'rgba(54, 162, 235, 1)', width: 1 }
+                        }
+                    };
+
+                    const traceRHR = {
+                        x: data.dates,
+                        y: data.rhr,
+                        name: 'RHR',
+                        yaxis: 'y2',
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        line: { color: '#ff4d4d', width: 2 },
+                        marker: { size: 6 }
+                    };
+
+                    const layout = {
+                        title: { text: '', font: { color: '#e0e0e0' } },
+                        paper_bgcolor: 'rgba(0,0,0,0)',
+                        plot_bgcolor: 'rgba(0,0,0,0)',
+                        showlegend: true,
+                        legend: { x: 0, y: 1.1, orientation: 'h', font: { color: '#a0a0a0' } },
+                        xaxis: { 
+                            color: '#a0a0a0', 
+                            showgrid: false 
+                        },
+                        yaxis: { 
+                            title: 'Steps', 
+                            color: '#a0a0a0', 
+                            showgrid: true, 
+                            gridcolor: 'rgba(255,255,255,0.05)'
+                        },
+                        yaxis2: {
+                            title: 'RHR (bpm)',
+                            overlaying: 'y',
+                            side: 'right',
+                            color: '#ff4d4d'
+                        },
+                        shapes: [
+                            {
+                                type: 'line',
+                                xref: 'paper',
+                                x0: 0,
+                                x1: 1,
+                                yref: 'y',
+                                y0: 4500,
+                                y1: 4500,
+                                line: {
+                                    color: 'rgb(255, 99, 132)',
+                                    width: 2,
+                                    dash: 'dash'
+                                },
+                            }
+                        ],
+                        annotations: [
+                            {
+                                xref: 'paper',
+                                x: 0.98,
+                                y: 4500,
+                                yref: 'y',
+                                text: 'Safety Ceiling',
+                                showarrow: false,
+                                font: { color: 'rgb(255, 99, 132)', size: 10 },
+                                yanchor: 'bottom'
+                            }
+                        ],
+                        margin: { l: 50, r: 50, t: 40, b: 40 }
+                    };
+
+                    Plotly.newPlot('trendChart', [traceSteps, traceRHR], layout, {responsive: true, displayModeBar: false});
+                });
+        });
+    </script>
+</body>
+</html>
