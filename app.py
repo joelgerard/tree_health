@@ -65,50 +65,75 @@ def parse_time_str(time_str):
         print(f"Error parsing time {time_str}: {e}")
         return 0.0
 
-def get_daily_data(day_date):
+def get_daily_data(day_date, conn=None):
     """
     Fetch daily summary for a specific date object.
     """
     try:
-        conn = get_db_connection(GARMIN_DB)
+        should_close = False
+        if conn is None:
+            conn = get_db_connection(GARMIN_DB)
+            should_close = True
+            
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM daily_summary WHERE day = ?", (day_date.isoformat(),))
         row = cursor.fetchone()
-        conn.close()
+        
+        if should_close:
+            conn.close()
+            
         return row
     except Exception as e:
         print(f"Error fetching daily data for {day_date}: {e}")
         return None
 
-def get_resting_hr(day_date):
+def get_resting_hr(day_date, conn=None):
     try:
-        conn = get_db_connection(GARMIN_DB)
+        should_close = False
+        if conn is None:
+            conn = get_db_connection(GARMIN_DB)
+            should_close = True
+            
         cursor = conn.cursor()
         cursor.execute("SELECT resting_heart_rate FROM resting_hr WHERE day = ?", (day_date.isoformat(),))
         row = cursor.fetchone()
-        conn.close()
+        
+        if should_close:
+            conn.close()
+            
         return row['resting_heart_rate'] if row else None
     except Exception:
         return None
 
-def get_hrv_data(day_date):
+def get_hrv_data(day_date, conn=None):
     try:
-        conn = get_db_connection(GARMIN_DB)
+        should_close = False
+        if conn is None:
+            conn = get_db_connection(GARMIN_DB)
+            should_close = True
+            
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM hrv WHERE day = ?", (day_date.isoformat(),))
         row = cursor.fetchone()
-        conn.close()
+        
+        if should_close:
+            conn.close()
+            
         return row
     except Exception as e:
         print(f"Error fetching HRV data for {day_date}: {e}")
         return None
 
-def get_activities(day_date):
+def get_activities(day_date, conn=None):
     """
     Fetch walking/hiking activities for a specific date.
     """
     try:
-        conn = get_db_connection(GARMIN_ACTIVITIES_DB)
+        should_close = False
+        if conn is None:
+            conn = get_db_connection(GARMIN_ACTIVITIES_DB)
+            should_close = True
+            
         cursor = conn.cursor()
         # Filter for walking/hiking and ensure valid cadence
         # Note: start_time is DATETIME, we need to match the date part
@@ -120,7 +145,10 @@ def get_activities(day_date):
         """
         cursor.execute(query, (day_date.isoformat(),))
         rows = cursor.fetchall()
-        conn.close()
+        
+        if should_close:
+            conn.close()
+            
         return rows
     except Exception as e:
         print(f"Error fetching activities for {day_date}: {e}")
@@ -180,7 +208,7 @@ def check_freshness():
         
     return False, "Error", "Error", "Error", False
 
-def get_recovery_score(conn, daily_status):
+def get_recovery_score(conn, daily_status, target_date=None):
     """
     Calculates Recovery Score (0-100%) using Gaussian/Bell Curve logic.
     Refined for "Parasympathetic Saturation" detection.
@@ -199,7 +227,7 @@ def get_recovery_score(conn, daily_status):
     WEIGHT_STRESS = 0.2
     
     # Time Window
-    today = datetime.now().date()
+    today = target_date if target_date else datetime.now().date()
     seven_days_ago = today - timedelta(days=7)
     start_str = seven_days_ago.isoformat()
     end_str = today.isoformat()
@@ -334,11 +362,11 @@ def get_recovery_score(conn, daily_status):
         }
     }
 
-def calculate_metrics():
+def calculate_metrics(target_date=None, conn=None, conn_activities=None):
     """
     Query databases and apply strict logic rules for the dashboard.
     """
-    today = datetime.now().date()
+    today = target_date if target_date else datetime.now().date()
     yesterday = today - timedelta(days=1)
     two_days_ago = today - timedelta(days=2)
 
@@ -354,7 +382,7 @@ def calculate_metrics():
     }
 
     # --- Metric 1: Crash Predictor (T-2) ---
-    t2_data = get_daily_data(two_days_ago)
+    t2_data = get_daily_data(two_days_ago, conn)
     if t2_data:
         steps_t2 = t2_data['steps'] or 0
         vigorous_t2_str = t2_data['vigorous_activity_time']
@@ -381,7 +409,7 @@ def calculate_metrics():
             metrics["warnings_count"] += 1
 
     # --- Metric 2: Safety Ceiling (T-1) ---
-    t1_data = get_daily_data(yesterday)
+    t1_data = get_daily_data(yesterday, conn)
     if t1_data:
         steps_t1 = t1_data['steps'] or 0
         hr_max_t1 = t1_data['hr_max'] or 0
@@ -399,13 +427,13 @@ def calculate_metrics():
     # Requirement says: Query `overnight_hrv` (last night) and `resting_heart_rate` (yesterday/today).
     # We'll try today's RHR first, then yesterday's? "resting_heart_rate (yesterday/today)" usually implies latest available.
     # Let's try today first.
-    rhr = get_resting_hr(today)
+    rhr = get_resting_hr(today, conn)
     if rhr is None:
-        rhr = get_resting_hr(yesterday)
+        rhr = get_resting_hr(yesterday, conn)
     
     # HRV for "Last Night" is usually logged with Today's date in Garmin exports (Sleep date).
     # Let's verify this assumption. Usually "Overnight HRV" for the sleep ending today is dated Today.
-    hrv_row = get_hrv_data(today)
+    hrv_row = get_hrv_data(today, conn)
     
     if rhr is not None and hrv_row:
         hrv_val = hrv_row['last_night_avg']
@@ -424,7 +452,7 @@ def calculate_metrics():
     
     # --- Metric 4: Sleep Recharge (Today) ---
     # Looking for BB Charged from last night's sleep (Today's summary)
-    today_data = get_daily_data(today)
+    today_data = get_daily_data(today, conn)
     metrics["today_data_available"] = False
     
     if today_data:
@@ -445,7 +473,7 @@ def calculate_metrics():
 
     # --- Metric 5: Efficiency Check (Cadence Cost T-1) ---
     # Low Cadence yesterday (<90 spm total, ~45 1-foot) -> Fatigue Risk Today
-    activities_t1 = get_activities(yesterday)
+    activities_t1 = get_activities(yesterday, conn_activities)
     if activities_t1:
         for act in activities_t1:
             cadence = act['avg_cadence'] # 1-foot cadence from DB
@@ -637,6 +665,71 @@ def api_data():
         conn.close()
     except Exception as e:
         print(f"Error fetching API data: {e}")
+        
+    return jsonify(data)
+
+@app.route('/api/recovery_history')
+def api_recovery_history():
+    """
+    Return JSON data for Recovery Score history.
+    Includes Veto status handling.
+    Query Params:
+        days: (optional) Number of days to look back. Default 14.
+    """
+    try:
+        days = int(request.args.get('days', 14))
+    except ValueError:
+        days = 14
+        
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=days - 1)
+    
+    data = {
+        "dates": [],
+        "recovery_score": [],
+        "rhr_score": [],
+        "hrv_score": [],
+        "stress_score": []
+    }
+    
+    try:
+        conn = get_db_connection(GARMIN_DB)
+        conn_activities = get_db_connection(GARMIN_ACTIVITIES_DB)
+        
+        current = start_date
+        while current <= end_date:
+            date_str = current.isoformat()
+            data["dates"].append(date_str)
+            
+            # 1. Get Daily Status (for Veto)
+            try:
+                # Reuse connections for performance
+                metrics = calculate_metrics(target_date=current, conn=conn, conn_activities=conn_activities)
+                daily_status = metrics['final_verdict']['status']
+            except Exception as e:
+                print(f"Error calculating metrics for {date_str}: {e}")
+                daily_status = "GREEN" # Fallback
+
+            # 2. Get Recovery Score
+            try:
+                score_data = get_recovery_score(conn, daily_status, target_date=current)
+                data["recovery_score"].append(score_data['score'])
+                data["rhr_score"].append(score_data['details']['rhr']['score'])
+                data["hrv_score"].append(score_data['details']['hrv']['score'])
+                data["stress_score"].append(score_data['details']['stress']['score'])
+            except Exception as e:
+                print(f"Error calculating score for {date_str}: {e}")
+                data["recovery_score"].append(None)
+                data["rhr_score"].append(None)
+                data["hrv_score"].append(None)
+                data["stress_score"].append(None)
+            
+            current += timedelta(days=1)
+            
+        conn.close()
+        conn_activities.close()
+    except Exception as e:
+        print(f"Error fetching history data: {e}")
         
     return jsonify(data)
 

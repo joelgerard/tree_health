@@ -433,6 +433,11 @@
         <div class="glass-panel p-4">
             <div id="trendChart" style="width:100%; height:400px;"></div>
         </div>
+<!-- Recovery Score History -->
+<h5 class="text-secondary mb-3 ps-2 mt-5">Recovery Score History</h5>
+<div class="glass-panel p-4 mb-5">
+    <div id="recoveryChart" style="width:100%; height:400px;"></div>
+</div>
     </div>
 
     <!-- Chart Script -->
@@ -524,6 +529,77 @@
                     };
 
                     Plotly.newPlot('trendChart', [traceSteps, traceRHR], layout, { responsive: true, displayModeBar: false });
+                });
+
+            // Fetch Recovery History
+            fetch('/api/recovery_history?days=365')
+                .then(response => response.json())
+                .then(data => {
+                    const traceRecovery = {
+                        x: data.dates,
+                        y: data.recovery_score,
+                        name: 'Recovery Score',
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        line: { color: '#2c3e50', width: 4 },
+                        marker: { size: 10, color: '#2c3e50', line: { color: '#fff', width: 2 } }
+                    };
+
+                    const traceRHRScore = {
+                        x: data.dates,
+                        y: data.rhr_score,
+                        name: 'RHR Score',
+                        type: 'scatter',
+                        mode: 'lines',
+                        line: { color: '#e74c3c', width: 2, dash: 'dot' },
+                        visible: true
+                    };
+
+                    const traceHRVScore = {
+                        x: data.dates,
+                        y: data.hrv_score,
+                        name: 'HRV Score',
+                        type: 'scatter',
+                        mode: 'lines',
+                        line: { color: '#f1c40f', width: 2, dash: 'dot' },
+                        visible: true
+                    };
+
+                    const traceStressScore = {
+                        x: data.dates,
+                        y: data.stress_score,
+                        name: 'Stress Score',
+                        type: 'scatter',
+                        mode: 'lines',
+                        line: { color: '#9b59b6', width: 2, dash: 'dot' },
+                        visible: true
+                    };
+
+                    const layoutRec = {
+                        title: { text: '', font: { color: '#2c3e50' } },
+                        paper_bgcolor: 'rgba(0,0,0,0)',
+                        plot_bgcolor: 'rgba(0,0,0,0)',
+                        showlegend: true,
+                        legend: { x: 0, y: 1.15, orientation: 'h', font: { color: '#7f8c8d' } },
+                        xaxis: {
+                            color: '#7f8c8d',
+                            showgrid: false,
+                            tickfont: { size: 11 }
+                        },
+                        yaxis: {
+                            title: 'Score (%)',
+                            color: '#7f8c8d',
+                            showgrid: true,
+                            gridcolor: 'rgba(0, 0, 0, 0.05)',
+                            zeroline: false,
+                            range: [0, 105]
+                        },
+                        margin: { l: 50, r: 50, t: 40, b: 40 },
+                        hovermode: 'x unified',
+                        hoverlabel: { bgcolor: "#fff", bordercolor: "#eee", font: { color: "#333" } }
+                    };
+
+                    Plotly.newPlot('recoveryChart', [traceRecovery, traceRHRScore, traceHRVScore, traceStressScore], layoutRec, { responsive: true, displayModeBar: false });
                 });
         });
     </script>
