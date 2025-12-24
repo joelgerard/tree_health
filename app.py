@@ -7,7 +7,9 @@ from flask import Flask, render_template, jsonify, request
 app = Flask(__name__)
 
 # Configuration
-DB_DIR = os.path.expanduser("/Users/joelgerard/tree_home/HealthData/DBs")
+# DB_DIR = os.path.expanduser("/Users/joelgerard/tree_home/HealthData/DBs")
+
+DB_DIR = os.path.expanduser("/Users/joelgerard/Library/CloudStorage/GoogleDrive-joelgerard@gmail.com/My Drive/joel health/tree health/DBs")
 GARMIN_DB = os.path.join(DB_DIR, "garmin.db")
 GARMIN_ACTIVITIES_DB = os.path.join(DB_DIR, "garmin_activities.db")
 # Note: HRV data is now expected in garmin.db
@@ -76,11 +78,12 @@ def get_hrv_data(day_date):
 
 def check_freshness():
     """
-    Check if the latest entry in daily_summary and hrv_daily are within one day.
-    Returns (is_fresh, last_summary_str, last_hrv_str).
+    Check if the latest entries in daily_summary, hrv, and sleep are within one day (today or yesterday).
+    Returns (is_fresh, last_summary_str, last_hrv_str, last_sleep_str, is_sleep_today).
     """
     last_summary_date = None
     last_hrv_date = None
+    last_sleep_date = None
     
     try:
         # Check daily summary
@@ -88,37 +91,44 @@ def check_freshness():
         cursor = conn.cursor()
         cursor.execute("SELECT MAX(day) as last_day FROM daily_summary")
         row = cursor.fetchone()
-        conn.close()
         if row and row['last_day']:
             last_summary_date = datetime.strptime(row['last_day'], '%Y-%m-%d').date()
 
         # Check HRV
-        conn_hrv = get_db_connection(GARMIN_DB)
-        cursor_hrv = conn_hrv.cursor()
-        cursor_hrv.execute("SELECT MAX(day) as last_day FROM hrv")
-        row_hrv = cursor_hrv.fetchone()
-        conn_hrv.close()
+        cursor.execute("SELECT MAX(day) as last_day FROM hrv")
+        row_hrv = cursor.fetchone()
         if row_hrv and row_hrv['last_day']:
             last_hrv_date = datetime.strptime(row_hrv['last_day'], '%Y-%m-%d').date()
+
+        # Check Sleep
+        cursor.execute("SELECT MAX(day) as last_day FROM sleep")
+        row_sleep = cursor.fetchone()
+        if row_sleep and row_sleep['last_day']:
+            last_sleep_date = datetime.strptime(row_sleep['last_day'], '%Y-%m-%d').date()
+        
+        conn.close()
 
         today = datetime.now().date()
         yesterday = today - timedelta(days=1)
         
         is_summary_fresh = last_summary_date and last_summary_date >= yesterday
         is_hrv_fresh = last_hrv_date and last_hrv_date >= yesterday
+        # Specific requirement: "if the app doesn't have sleep data for the day, show the sync button"
+        is_sleep_today = last_sleep_date and last_sleep_date == today
         
-        is_fresh = is_summary_fresh and is_hrv_fresh
+        is_fresh = is_summary_fresh and is_hrv_fresh and is_sleep_today
         
         # Format for UI display
         summary_info = last_summary_date.isoformat() if last_summary_date else "No data"
         hrv_info = last_hrv_date.isoformat() if last_hrv_date else "No data"
+        sleep_info = last_sleep_date.isoformat() if last_sleep_date else "No data"
         
-        return is_fresh, summary_info, hrv_info
+        return is_fresh, summary_info, hrv_info, sleep_info, is_sleep_today
 
     except Exception as e:
         print(f"Error checking freshness: {e}", flush=True)
         
-    return False, "Error", "Error"
+    return False, "Error", "Error", "Error", False
 
 def calculate_metrics():
     """
@@ -242,9 +252,9 @@ def calculate_metrics():
 
 @app.route('/')
 def index():
-    is_fresh, last_data, last_hrv = check_freshness()
+    is_fresh, last_data, last_hrv, last_sleep, is_sleep_today = check_freshness()
     metrics = calculate_metrics()
-    return render_template('index.html', fresh=is_fresh, last_data=last_data, last_hrv=last_hrv, metrics=metrics)
+    return render_template('index.html', fresh=is_fresh, last_data=last_data, last_hrv=last_hrv, last_sleep=last_sleep, metrics=metrics)
 
 @app.route('/sync', methods=['POST'])
 def sync():
