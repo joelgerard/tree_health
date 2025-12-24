@@ -287,7 +287,7 @@ def calculate_metrics():
             # Let's count it as a warning for now.
             metrics["warnings_count"] += 1
 
-            metrics["warnings_count"] += 1
+
 
     # --- Metric 5: Efficiency Check (Cadence Cost T-1) ---
     # Low Cadence yesterday (<90 spm total, ~45 1-foot) -> Fatigue Risk Today
@@ -314,31 +314,48 @@ def calculate_metrics():
                 metrics["warnings_count"] += 1
 
     # --- Final Verdict ---
-    # GREEN: 0 warnings
-    # YELLOW: 1 warning
-    # RED: 2+ warnings OR High RHR (RHR > 53 implied from Metric 3? Or just explicitly checked?)
-    # Metric 3 checks RHR > 53. If Metric 3 is triggered, we have at least 1 warning.
-    # Actually, Metric 3 wording: "If RHR > 53 ... Output: Physiological Stress".
-    # Final Verdict RED condition: "If 2+ warnings or High RHR."
-    # So if RHR > 53, it's RED regardless of warning count?
-    # Let's explicitly check RHR for the RED override.
+    # Collect reasons
+    reasons = []
     
+    # Check individual metrics for non-GREEN status
+    if metrics["crash_predictor"]["status"] != "GREEN":
+        reasons.append("T-2 Fatigue Trigger")
+    if metrics["safety_ceiling"]["status"] != "GREEN":
+        reasons.append("Safety Ceiling Exceeded")
+    if metrics["autonomic_stress"]["status"] != "GREEN":
+        reasons.append("Physiological Stress")
+    if metrics["sleep_recharge"]["status"] != "GREEN":
+        reasons.append("Poor Sleep Recharge")
+    if metrics["efficiency_check"]["status"] != "GREEN":
+        reasons.append("Inefficient Movement")
+    if metrics["respiration_warning"]["status"] != "GREEN":
+        reasons.append("Elevated Breathing")
+
+    # RHR Override Reason
     rhr_high = False
     if rhr and rhr > 53:
         rhr_high = True
+        if "Physiological Stress" not in reasons:
+            reasons.append("High RHR (>53)")
 
     warnings = metrics["warnings_count"]
     
     if warnings >= 2 or rhr_high:
+        base_msg = "🛑 STOP. Rest Day."
+        if rhr_high:
+             base_msg = "🛑 STOP. High RHR detected."
+             
+        reason_str = ", ".join(reasons)
         metrics["final_verdict"] = {
             "status": "RED", 
-            "msg": "🛑 STOP. Rest Day. Target: <1,500 Steps.",
+            "msg": f"{base_msg} Reasons: {reason_str}. Target: <1,500 Steps.",
             "target": "< 1,500 Steps"
         }
     elif warnings == 1:
+        reason_str = ", ".join(reasons)
         metrics["final_verdict"] = {
             "status": "YELLOW", 
-            "msg": "⚠️ Caution. Limit Activity. Target: 3,000 Steps.",
+            "msg": f"⚠️ Caution. Reasons: {reason_str}. Target: 3,000 Steps.",
             "target": "3,000 Steps"
         }
     else:
