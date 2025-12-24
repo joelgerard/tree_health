@@ -103,6 +103,29 @@ def get_hrv_data(day_date):
         print(f"Error fetching HRV data for {day_date}: {e}")
         return None
 
+def get_activities(day_date):
+    """
+    Fetch walking/hiking activities for a specific date.
+    """
+    try:
+        conn = get_db_connection(GARMIN_ACTIVITIES_DB)
+        cursor = conn.cursor()
+        # Filter for walking/hiking and ensure valid cadence
+        # Note: start_time is DATETIME, we need to match the date part
+        # SQLite substr(start_time, 1, 10) gets YYYY-MM-DD
+        query = """
+            SELECT * FROM activities 
+            WHERE substr(start_time, 1, 10) = ? 
+            AND (type LIKE '%walking%' OR type LIKE '%hiking%' OR sport LIKE '%walking%')
+        """
+        cursor.execute(query, (day_date.isoformat(),))
+        rows = cursor.fetchall()
+        conn.close()
+        return rows
+    except Exception as e:
+        print(f"Error fetching activities for {day_date}: {e}")
+        return []
+
 def check_freshness():
     """
     Check if the latest entries in daily_summary, hrv, and sleep are within one day (today or yesterday).
@@ -170,6 +193,8 @@ def calculate_metrics():
         "safety_ceiling": {"status": "GREEN", "msg": "Within limits"},
         "autonomic_stress": {"status": "GREEN", "msg": "Normal"},
         "sleep_recharge": {"status": "GREEN", "msg": "Good recharge"},
+        "efficiency_check": {"status": "GREEN", "msg": "Efficient movement"},
+        "respiration_warning": {"status": "GREEN", "msg": "Stable breathing"},
         "final_verdict": {"status": "GREEN", "msg": "Safe to proceed", "target": "4,500 Steps"},
         "warnings_count": 0
     }
@@ -261,6 +286,32 @@ def calculate_metrics():
             # "Poor Recharge" (Metric 4).
             # Let's count it as a warning for now.
             metrics["warnings_count"] += 1
+
+            metrics["warnings_count"] += 1
+
+    # --- Metric 5: Efficiency Check (Cadence Cost T-1) ---
+    # Low Cadence yesterday (<90 spm total, ~45 1-foot) -> Fatigue Risk Today
+    activities_t1 = get_activities(yesterday)
+    if activities_t1:
+        for act in activities_t1:
+            cadence = act['avg_cadence'] # 1-foot cadence from DB
+            if cadence and cadence > 0 and cadence < 45:
+                # 45 * 2 = 90 spm threshold
+                metrics["efficiency_check"] = {"status": "YELLOW", "msg": "⚠️ Inefficient Movement (Shuffling) detected yesterday."}
+                metrics["warnings_count"] += 1
+                break
+
+    # --- Metric 6: Respiration Early Warning (T-1 vs T-2) ---
+    # Rise in RR > 1.0 brpm predicts crash
+    if t1_data and t2_data:
+        rr_t1 = t1_data['rr_waking_avg']
+        rr_t2 = t2_data['rr_waking_avg']
+        
+        if rr_t1 and rr_t2:
+            rr_delta = rr_t1 - rr_t2
+            if rr_delta > 1.0:
+                metrics["respiration_warning"] = {"status": "YELLOW", "msg": f"⚠️ Elevated Breathing (+{rr_delta:.1f} brpm) detected."}
+                metrics["warnings_count"] += 1
 
     # --- Final Verdict ---
     # GREEN: 0 warnings
