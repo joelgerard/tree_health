@@ -16,48 +16,52 @@
 
     <style>
         :root {
-            --glass-bg: rgba(20, 20, 30, 0.7);
-            --glass-border: rgba(255, 255, 255, 0.08);
-            --card-bg: rgba(30, 30, 40, 0.6);
-            --accent-green: #00d26a;
-            --accent-yellow: #ffc107;
-            --accent-red: #ff4d4d;
-            --text-primary: #e0e0e0;
-            --text-secondary: #a0a0a0;
+            /* Light, Energetic & Hopeful Palette */
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --card-bg: rgba(255, 255, 255, 0.85);
+            --accent-green: #2ecc71;
+            --accent-yellow: #f1c40f;
+            --accent-red: #e74c3c;
+            --text-primary: #2c3e50;
+            --text-secondary: #7f8c8d;
+            --bg-gradient: linear-gradient(135deg, #a8e6cf 0%, #dcedc1 30%, #ffd3b6 70%, #ffaaa5 100%);
         }
 
         body {
             font-family: 'Outfit', sans-serif;
-            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            background: var(--bg-gradient);
             background-attachment: fixed;
             color: var(--text-primary);
             min-height: 100vh;
+            overflow-x: hidden;
         }
 
         .glass-panel {
             background: var(--glass-bg);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
             border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
         }
 
         .metric-card {
             background: var(--card-bg);
             border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            transition: transform 0.2s, box-shadow 0.2s;
+            border-radius: 16px;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
         .metric-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+            background: rgba(255, 255, 255, 1);
         }
 
         .status-indicator {
-            width: 12px;
-            height: 12px;
+            width: 14px;
+            height: 14px;
             border-radius: 50%;
             display: inline-block;
             margin-right: 8px;
@@ -65,21 +69,21 @@
 
         .status-GREEN {
             background-color: var(--accent-green);
-            box-shadow: 0 0 10px var(--accent-green);
+            box-shadow: 0 0 15px var(--accent-green);
         }
 
         .status-YELLOW {
             background-color: var(--accent-yellow);
-            box-shadow: 0 0 10px var(--accent-yellow);
+            box-shadow: 0 0 15px var(--accent-yellow);
         }
 
         .status-RED {
             background-color: var(--accent-red);
-            box-shadow: 0 0 10px var(--accent-red);
+            box-shadow: 0 0 15px var(--accent-red);
         }
 
         .verdict-large {
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             font-weight: 600;
         }
 
@@ -88,11 +92,69 @@
         }
 
         .text-YELLOW {
-            color: var(--accent-yellow) !important;
+            color: #d4ac0d !important;
         }
 
         .text-RED {
             color: var(--accent-red) !important;
+        }
+
+        /* Magical Unicorn Styles */
+        .unicorn-corner {
+            position: fixed;
+            top: -20px;
+            right: -20px;
+            width: 200px;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 50%;
+            border: 4px solid white;
+            z-index: 1000;
+            pointer-events: none;
+            opacity: 0.95;
+            filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.9));
+            animation: floating 8s ease-in-out infinite;
+        }
+
+        @keyframes floating {
+            0% {
+                transform: translateY(0px) rotate(0deg);
+            }
+
+            50% {
+                transform: translateY(20px) rotate(3deg);
+            }
+
+            100% {
+                transform: translateY(0px) rotate(0deg);
+            }
+        }
+
+        /* Rain Effect Overlay */
+        .rain-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1001;
+            overflow: hidden;
+            opacity: 0.3;
+        }
+
+        .raindrop {
+            position: absolute;
+            background: linear-gradient(transparent, rgba(255, 255, 255, 0.8));
+            width: 2px;
+            height: 20px;
+            animation: fall linear infinite;
+        }
+
+        @keyframes fall {
+            to {
+                transform: translateY(100vh);
+            }
         }
 
         /* Custom Scrollbar */
@@ -105,7 +167,7 @@
         }
 
         ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.1);
             border-radius: 4px;
         }
 
@@ -120,6 +182,24 @@
 </head>
 
 <body class="py-4">
+    <div class="rain-container" id="rain"></div>
+    <img src="{{ url_for('static', filename='images/unicorn.png') }}" class="unicorn-corner" alt="Magical Unicorn">
+
+    <script>
+        function createRain() {
+            const container = document.getElementById('rain');
+            const count = 50;
+            for (let i = 0; i < count; i++) {
+                const drop = document.createElement('div');
+                drop.classList.add('raindrop');
+                drop.style.left = Math.random() * 100 + 'vw';
+                drop.style.animationDuration = (Math.random() * 1 + 0.5) + 's';
+                drop.style.animationDelay = Math.random() * 2 + 's';
+                container.appendChild(drop);
+            }
+        }
+        createRain();
+    </script>
     <div class="container">
         <!-- Header Section -->
         <header class="mb-5 glass-panel p-4 position-relative overflow-hidden">
@@ -300,8 +380,8 @@
                         name: 'Steps',
                         type: 'bar',
                         marker: {
-                            color: 'rgba(54, 162, 235, 0.6)',
-                            line: { color: 'rgba(54, 162, 235, 1)', width: 1 }
+                            color: 'rgba(46, 204, 113, 0.4)',
+                            line: { color: 'rgba(46, 204, 113, 0.8)', width: 1.5 }
                         }
                     };
 
@@ -312,31 +392,35 @@
                         yaxis: 'y2',
                         type: 'scatter',
                         mode: 'lines+markers',
-                        line: { color: '#ff4d4d', width: 2 },
-                        marker: { size: 6 }
+                        line: { color: '#e74c3c', width: 3, shape: 'spline' },
+                        marker: { size: 8, color: '#e74c3c', line: { color: '#fff', width: 2 } }
                     };
 
                     const layout = {
-                        title: { text: '', font: { color: '#e0e0e0' } },
+                        title: { text: '', font: { color: '#2c3e50' } },
                         paper_bgcolor: 'rgba(0,0,0,0)',
                         plot_bgcolor: 'rgba(0,0,0,0)',
                         showlegend: true,
-                        legend: { x: 0, y: 1.1, orientation: 'h', font: { color: '#a0a0a0' } },
+                        legend: { x: 0, y: 1.15, orientation: 'h', font: { color: '#7f8c8d' } },
                         xaxis: {
-                            color: '#a0a0a0',
-                            showgrid: false
+                            color: '#7f8c8d',
+                            showgrid: false,
+                            tickfont: { size: 11 }
                         },
                         yaxis: {
                             title: 'Steps',
-                            color: '#a0a0a0',
+                            color: '#7f8c8d',
                             showgrid: true,
-                            gridcolor: 'rgba(255,255,255,0.05)'
+                            gridcolor: 'rgba(0, 0, 0, 0.05)',
+                            zeroline: false
                         },
                         yaxis2: {
                             title: 'RHR (bpm)',
                             overlaying: 'y',
                             side: 'right',
-                            color: '#ff4d4d'
+                            color: '#e74c3c',
+                            showgrid: false,
+                            zeroline: false
                         },
                         shapes: [
                             {
@@ -348,9 +432,9 @@
                                 y0: 4500,
                                 y1: 4500,
                                 line: {
-                                    color: 'rgb(255, 99, 132)',
+                                    color: 'rgba(231, 76, 60, 0.5)',
                                     width: 2,
-                                    dash: 'dash'
+                                    dash: 'dot'
                                 },
                             }
                         ],
@@ -358,15 +442,18 @@
                             {
                                 xref: 'paper',
                                 x: 0.98,
+                                xanchor: 'right',
                                 y: 4500,
                                 yref: 'y',
-                                text: 'Safety Ceiling',
+                                text: 'Safety Limit',
                                 showarrow: false,
-                                font: { color: 'rgb(255, 99, 132)', size: 10 },
+                                font: { color: '#e74c3c', size: 10, weight: 'bold' },
                                 yanchor: 'bottom'
                             }
                         ],
-                        margin: { l: 50, r: 50, t: 40, b: 40 }
+                        margin: { l: 50, r: 50, t: 40, b: 40 },
+                        hovermode: 'x unified',
+                        hoverlabel: { bgcolor: "#fff", bordercolor: "#eee", font: { color: "#333" } }
                     };
 
                     Plotly.newPlot('trendChart', [traceSteps, traceRHR], layout, { responsive: true, displayModeBar: false });
