@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,7 +13,7 @@
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <!-- Plotly -->
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    
+
     <style>
         :root {
             --glass-bg: rgba(20, 20, 30, 0.7);
@@ -62,39 +63,62 @@
             margin-right: 8px;
         }
 
-        .status-GREEN { background-color: var(--accent-green); box-shadow: 0 0 10px var(--accent-green); }
-        .status-YELLOW { background-color: var(--accent-yellow); box-shadow: 0 0 10px var(--accent-yellow); }
-        .status-RED { background-color: var(--accent-red); box-shadow: 0 0 10px var(--accent-red); }
+        .status-GREEN {
+            background-color: var(--accent-green);
+            box-shadow: 0 0 10px var(--accent-green);
+        }
+
+        .status-YELLOW {
+            background-color: var(--accent-yellow);
+            box-shadow: 0 0 10px var(--accent-yellow);
+        }
+
+        .status-RED {
+            background-color: var(--accent-red);
+            box-shadow: 0 0 10px var(--accent-red);
+        }
 
         .verdict-large {
             font-size: 1.5rem;
             font-weight: 600;
         }
 
-        .text-GREEN { color: var(--accent-green) !important; }
-        .text-YELLOW { color: var(--accent-yellow) !important; }
-        .text-RED { color: var(--accent-red) !important; }
+        .text-GREEN {
+            color: var(--accent-green) !important;
+        }
+
+        .text-YELLOW {
+            color: var(--accent-yellow) !important;
+        }
+
+        .text-RED {
+            color: var(--accent-red) !important;
+        }
 
         /* Custom Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
         }
+
         ::-webkit-scrollbar-track {
             background: transparent;
         }
+
         ::-webkit-scrollbar-thumb {
-            background: rgba(255,255,255,0.2);
+            background: rgba(255, 255, 255, 0.2);
             border-radius: 4px;
         }
-        
+
         .loader {
             display: none;
         }
+
         .htmx-request .loader {
             display: inline-block;
         }
     </style>
 </head>
+
 <body class="py-4">
     <div class="container">
         <!-- Header Section -->
@@ -104,26 +128,27 @@
                     <h6 class="text-uppercase text-secondary mb-1 letter-spacing-2">Recovery Dashboard</h6>
                     <h1 class="display-5 fw-bold mb-0">Daily Briefing</h1>
                     <p class="mb-0 text-secondary mt-2">
-                        Data Status: 
+                        Data Status:
                         {% if fresh %}
-                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3">
-                            <i class="bi bi-check-circle-fill me-1"></i> Up to Date
+                        <span
+                            class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3">
+                            <i class="bi bi-check-circle-fill me-1"></i> Up to Date (Daily: {{ last_data }}, HRV: {{
+                            last_hrv }})
                         </span>
                         {% else %}
-                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-3">
-                             Stale - Sync Needed
+                        <span
+                            class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-3">
+                            Stale - Daily: {{ last_data }}, HRV: {{ last_hrv }}
                         </span>
                         {% endif %}
                     </p>
                 </div>
-                
+
                 <div class="d-flex align-items-center gap-3">
                     {% if not fresh %}
                     <button class="btn btn-primary px-4 py-2 rounded-pill d-flex align-items-center gap-2"
-                            hx-post="/sync" 
-                            hx-swap="none"
-                            onclick="location.reload()" 
-                            style="background-color: #4a6fa5; border: none;">
+                        hx-post="/sync" hx-swap="none" onclick="location.reload()"
+                        style="background-color: #4a6fa5; border: none;">
                         <span class="loader spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                         <span>Sync Now</span>
                     </button>
@@ -137,14 +162,14 @@
                          Let's simple verify: hx-post="/sync" -> on htmx:afterRequest -> reload.
                     -->
                     <script>
-                        document.body.addEventListener('htmx:beforeRequest', function(evt) {
-                            if(evt.detail.elt.getAttribute('hx-post') === '/sync') {
+                        document.body.addEventListener('htmx:beforeRequest', function (evt) {
+                            if (evt.detail.elt.getAttribute('hx-post') === '/sync') {
                                 document.getElementById('syncOverlay').style.display = 'flex';
                             }
                         });
-                        document.body.addEventListener('htmx:afterRequest', function(evt) {
-                            if(evt.detail.elt.getAttribute('hx-post') === '/sync') {
-                                if(evt.detail.successful) {
+                        document.body.addEventListener('htmx:afterRequest', function (evt) {
+                            if (evt.detail.elt.getAttribute('hx-post') === '/sync') {
+                                if (evt.detail.successful) {
                                     window.location.reload();
                                 } else {
                                     document.getElementById('syncOverlay').style.display = 'none';
@@ -154,24 +179,27 @@
                         });
                     </script>
                     {% endif %}
-                    
+
                     <div class="text-end glass-panel p-3 px-4" style="background: rgba(0,0,0,0.2);">
-                         <div class="text-secondary small text-uppercase">Today's Target</div>
-                         <div class="h2 mb-0 fw-bold {{ 'text-' + metrics.final_verdict.status }}">{{ metrics.final_verdict.target }}</div>
+                        <div class="text-secondary small text-uppercase">Today's Target</div>
+                        <div class="h2 mb-0 fw-bold {{ 'text-' + metrics.final_verdict.status }}">{{
+                            metrics.final_verdict.target }}</div>
                     </div>
                 </div>
             </div>
         </header>
 
         <!-- Sync Overlay -->
-        <div id="syncOverlay" class="position-fixed top-0 start-0 w-100 h-100 flex-column align-items-center justify-content-center" 
-             style="display: none; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); z-index: 9999;">
+        <div id="syncOverlay"
+            class="position-fixed top-0 start-0 w-100 h-100 flex-column align-items-center justify-content-center"
+            style="display: none; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); z-index: 9999;">
             <div class="glass-panel p-5 text-center" style="max-width: 400px; border-color: var(--accent-green);">
                 <div class="spinner-border text-primary mb-4" style="width: 3rem; height: 3rem;" role="status">
                     <span class="visually-hidden">Loading...</span>
                 </div>
                 <h3 class="fw-bold mb-3">Syncing Biometrics</h3>
-                <p class="text-secondary mb-0">Fetching latest data from Garmin. This process can take 1-2 minutes depending on your connection.</p>
+                <p class="text-secondary mb-0">Fetching latest data from Garmin. This process can take 1-2 minutes
+                    depending on your connection.</p>
                 <div class="mt-4 small text-secondary italic">
                     <i class="bi bi-info-circle me-1"></i> Check terminal logs for detailed progress
                 </div>
@@ -203,7 +231,7 @@
                         <div class="status-indicator status-{{ metrics.safety_ceiling.status }}"></div>
                     </div>
                     <h5 class="card-title fw-normal mb-1 {{ 'text-' + metrics.safety_ceiling.status }}">
-                         {{ metrics.safety_ceiling.msg }}
+                        {{ metrics.safety_ceiling.msg }}
                     </h5>
                     <p class="text-secondary small mt-2 mb-0">Yesterday's Load</p>
                 </div>
@@ -217,7 +245,7 @@
                         <div class="status-indicator status-{{ metrics.autonomic_stress.status }}"></div>
                     </div>
                     <h5 class="card-title fw-normal mb-1 {{ 'text-' + metrics.autonomic_stress.status }}">
-                         {{ metrics.autonomic_stress.msg }}
+                        {{ metrics.autonomic_stress.msg }}
                     </h5>
                     <p class="text-secondary small mt-2 mb-0">RHR & HRV Analysis</p>
                 </div>
@@ -231,7 +259,7 @@
                         <div class="status-indicator status-{{ metrics.sleep_recharge.status }}"></div>
                     </div>
                     <h5 class="card-title fw-normal mb-1 {{ 'text-' + metrics.sleep_recharge.status }}">
-                         {{ metrics.sleep_recharge.msg }}
+                        {{ metrics.sleep_recharge.msg }}
                     </h5>
                     {% if metrics.today_data_available %}
                     <p class="text-secondary small mt-2 mb-0">Body Battery</p>
@@ -243,10 +271,11 @@
         </div>
 
         <!-- Verdict Banner -->
-        <div class="glass-panel p-4 mb-5 text-center position-relative overflow-hidden" 
-             style="border-color: var(--accent-{{ metrics.final_verdict.status }}); border-width: 1px; box-shadow: 0 0 20px rgba(0,0,0,0.2);">
-            <div class="position-absolute top-0 start-0 w-100 h-100" 
-                 style="background: radial-gradient(circle at center, var(--accent-{{ metrics.final_verdict.status }}), transparent 70%); opacity: 0.1;"></div>
+        <div class="glass-panel p-4 mb-5 text-center position-relative overflow-hidden"
+            style="border-color: var(--accent-{{ metrics.final_verdict.status }}); border-width: 1px; box-shadow: 0 0 20px rgba(0,0,0,0.2);">
+            <div class="position-absolute top-0 start-0 w-100 h-100"
+                style="background: radial-gradient(circle at center, var(--accent-{{ metrics.final_verdict.status }}), transparent 70%); opacity: 0.1;">
+            </div>
             <h2 class="verdict-large mb-0 {{ 'text-' + metrics.final_verdict.status }}">
                 {{ metrics.final_verdict.msg }}
             </h2>
@@ -261,7 +290,7 @@
 
     <!-- Chart Script -->
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             fetch('/api/data')
                 .then(response => response.json())
                 .then(data => {
@@ -293,14 +322,14 @@
                         plot_bgcolor: 'rgba(0,0,0,0)',
                         showlegend: true,
                         legend: { x: 0, y: 1.1, orientation: 'h', font: { color: '#a0a0a0' } },
-                        xaxis: { 
-                            color: '#a0a0a0', 
-                            showgrid: false 
+                        xaxis: {
+                            color: '#a0a0a0',
+                            showgrid: false
                         },
-                        yaxis: { 
-                            title: 'Steps', 
-                            color: '#a0a0a0', 
-                            showgrid: true, 
+                        yaxis: {
+                            title: 'Steps',
+                            color: '#a0a0a0',
+                            showgrid: true,
                             gridcolor: 'rgba(255,255,255,0.05)'
                         },
                         yaxis2: {
@@ -340,9 +369,10 @@
                         margin: { l: 50, r: 50, t: 40, b: 40 }
                     };
 
-                    Plotly.newPlot('trendChart', [traceSteps, traceRHR], layout, {responsive: true, displayModeBar: false});
+                    Plotly.newPlot('trendChart', [traceSteps, traceRHR], layout, { responsive: true, displayModeBar: false });
                 });
         });
     </script>
 </body>
+
 </html>

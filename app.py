@@ -75,32 +75,49 @@ def get_hrv_data(day_date):
 
 def check_freshness():
     """
-    Check if the latest entry in daily_summary is today.
-    Returns True if fresh, False otherwise.
+    Check if the latest entry in daily_summary and hrv_daily are within one day.
+    Returns (is_fresh, last_summary_str, last_hrv_str).
     """
+    last_summary_date = None
+    last_hrv_date = None
+    
     try:
+        # Check daily summary
         conn = get_db_connection(GARMIN_DB)
         cursor = conn.cursor()
         cursor.execute("SELECT MAX(day) as last_day FROM daily_summary")
         row = cursor.fetchone()
         conn.close()
-        
         if row and row['last_day']:
-            today = datetime.now().date()
-            yesterday = today - timedelta(days=1)
-            last_day = datetime.strptime(row['last_day'], '%Y-%m-%d').date()
-            
-            # Fresh if it's today
-            if last_day == today:
-                return True
-                
-            # Or if it's early morning (before 10 AM) and we have yesterday's data
-            is_morning = datetime.now().hour < 10
-            if is_morning and last_day == yesterday:
-                return True
+            last_summary_date = datetime.strptime(row['last_day'], '%Y-%m-%d').date()
+
+        # Check HRV
+        conn_hrv = get_db_connection(GARMIN_HRV_DB)
+        cursor_hrv = conn_hrv.cursor()
+        cursor_hrv.execute("SELECT MAX(date) as last_date FROM hrv_daily")
+        row_hrv = cursor_hrv.fetchone()
+        conn_hrv.close()
+        if row_hrv and row_hrv['last_date']:
+            last_hrv_date = datetime.strptime(row_hrv['last_date'], '%Y-%m-%d').date()
+
+        today = datetime.now().date()
+        yesterday = today - timedelta(days=1)
+        
+        is_summary_fresh = last_summary_date and last_summary_date >= yesterday
+        is_hrv_fresh = last_hrv_date and last_hrv_date >= yesterday
+        
+        is_fresh = is_summary_fresh and is_hrv_fresh
+        
+        # Format for UI display
+        summary_info = last_summary_date.isoformat() if last_summary_date else "No data"
+        hrv_info = last_hrv_date.isoformat() if last_hrv_date else "No data"
+        
+        return is_fresh, summary_info, hrv_info
+
     except Exception as e:
         print(f"Error checking freshness: {e}", flush=True)
-    return False
+        
+    return False, "Error", "Error"
 
 def calculate_metrics():
     """
@@ -224,9 +241,9 @@ def calculate_metrics():
 
 @app.route('/')
 def index():
-    is_fresh = check_freshness()
+    is_fresh, last_data, last_hrv = check_freshness()
     metrics = calculate_metrics()
-    return render_template('index.html', fresh=is_fresh, metrics=metrics)
+    return render_template('index.html', fresh=is_fresh, last_data=last_data, last_hrv=last_hrv, metrics=metrics)
 
 @app.route('/sync', methods=['POST'])
 def sync():
