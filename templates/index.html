@@ -316,6 +316,43 @@
             </div>
         </div>
 
+        <!-- Recovery Index Card -->
+        <h5 class="text-secondary mb-3 ps-2">Recovery Index</h5>
+        <div class="glass-panel p-4 mb-5">
+            <div class="row align-items-center">
+                <div class="col-md-4 text-center border-end border-light">
+                    {% if recovery %}
+                    <h1
+                        class="display-3 fw-bold mb-0 {% if recovery.score >= 80 %}text-success{% elif recovery.score >= 50 %}text-warning{% else %}text-danger{% endif %}">
+                        {{ recovery.score }}%
+                    </h1>
+                    <p class="text-secondary mb-0">Recovery Score</p>
+                    {% else %}
+                    <h1 class="display-3 fw-bold mb-0 text-secondary">--%</h1>
+                    <p class="text-secondary mb-0">No Data</p>
+                    {% endif %}
+                </div>
+                <div class="col-md-8">
+                    <div class="row text-center mt-3 mt-md-0">
+                        {% if recovery %}
+                        <div class="col-4">
+                            <div class="h4 mb-0">{{ recovery.details.rhr.val }}</div>
+                            <small class="text-secondary">RHR ({{ recovery.details.rhr.score }}%)</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="h4 mb-0">{{ recovery.details.hrv.val }}</div>
+                            <small class="text-secondary">HRV ({{ recovery.details.hrv.score }}%)</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="h4 mb-0">{{ recovery.details.stress.adj }}</div>
+                            <small class="text-secondary">Stress ({{ recovery.details.stress.score }}%)</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Morning Briefing Grid -->
         <h5 class="text-secondary mb-3 ps-2">Physiological Status</h5>
         <div class="row g-4 mb-5">

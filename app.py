@@ -180,6 +180,160 @@ def check_freshness():
         
     return False, "Error", "Error", "Error", False
 
+def get_recovery_score(conn, daily_status):
+    """
+    Calculates Recovery Score (0-100%) using Gaussian/Bell Curve logic.
+    Refined for "Parasympathetic Saturation" detection.
+    """
+    cursor = conn.cursor()
+    
+    # --- 1. Golden Era Baselines (Mar 1 - May 31, 2025) ---
+    # Derived from get_golden_stats.py
+    GOLDEN_RHR_MEAN = 50.61
+    GOLDEN_RHR_SD = 1.78
+    GOLDEN_STRESS_MEAN = 35.77  # Age-uncorrected baseline from that era
+    
+    # Weights
+    WEIGHT_RHR = 0.4
+    WEIGHT_HRV = 0.4
+    WEIGHT_STRESS = 0.2
+    
+    # Time Window
+    today = datetime.now().date()
+    seven_days_ago = today - timedelta(days=7)
+    start_str = seven_days_ago.isoformat()
+    end_str = today.isoformat()
+    
+    # --- Fetch Data ---
+    
+    # RHR (Avg of last 7 days)
+    cursor.execute("""
+        SELECT AVG(resting_heart_rate) 
+        FROM resting_hr 
+        WHERE day BETWEEN ? AND ?
+    """, (start_str, end_str))
+    row = cursor.fetchone()
+    current_rhr = row[0] if row and row[0] else GOLDEN_RHR_MEAN
+
+    # HRV (Today vs 7-Day)
+    # Get Today's HRV (Last Night)
+    cursor.execute("SELECT last_night_avg FROM hrv WHERE day = ?", (today.isoformat(),))
+    row_hrv_today = cursor.fetchone()
+    hrv_today = row_hrv_today[0] if row_hrv_today and row_hrv_today[0] else None
+    
+    # Get 7-Day Avg HRV
+    cursor.execute("""
+        SELECT AVG(last_night_avg) 
+        FROM hrv 
+        WHERE day BETWEEN ? AND ?
+    """, (start_str, end_str))
+    row_hrv_7d = cursor.fetchone()
+    hrv_7d = row_hrv_7d[0] if row_hrv_7d and row_hrv_7d[0] else 51.45 # Fallback to Golden Baseline
+    
+    # If no data for today, assume neutral (match 7-day)
+    if hrv_today is None:
+        hrv_today = hrv_7d
+
+    # Stress (Avg of last 7 days)
+    cursor.execute("""
+        SELECT AVG(stress_avg) 
+        FROM daily_summary 
+        WHERE day BETWEEN ? AND ?
+    """, (start_str, end_str))
+    row_stress = cursor.fetchone()
+    raw_stress = row_stress[0] if row_stress and row_stress[0] else 30 # Default if empty
+    
+    # --- Scoring Logic ---
+
+    # 1. RHR Score (Gaussian Bell Curve)
+    # Z-Score = (Current - Mean) / SD
+    rhr_z = (current_rhr - GOLDEN_RHR_MEAN) / GOLDEN_RHR_SD
+    abs_z = abs(rhr_z)
+    
+    if abs_z <= 0.5:
+        # Sweet Spot (+/- 0.5 SD) -> 100%
+        rhr_score = 100
+    elif abs_z <= 1.5:
+        # Warning Zone (0.5 to 1.5 SD) -> Linear decay 100->70
+        # Decay factor: (abs_z - 0.5) ranges 0.0 to 1.0
+        decay = (abs_z - 0.5) * 30 
+        rhr_score = 100 - decay
+    else:
+        # Critical Zone (> 1.5 SD) -> Sharp drop 70->0
+        # "Parasympathetic Saturation" OR "Sympathetic Overdrive"
+        # Decay factor: (abs_z - 1.5) ranges 0.0 to ...
+        # e.g. at 2.5 SD, score should be very low.
+        extra_decay = (abs_z - 1.5) * 50
+        rhr_score = max(0, 70 - extra_decay)
+
+    # 2. HRV Balance Score (Stability vs Spike)
+    # Check for "Parasympathetic Saturation" (Spike > 20% above baseline)
+    # Check for "Sympathetic Stress" (Drop below baseline)
+    
+    hrv_ratio = hrv_today / hrv_7d if hrv_7d > 0 else 1.0
+    
+    if 0.9 <= hrv_ratio <= 1.2:
+        # Green Zone: Within 90-120% of trend
+        hrv_score = 100
+    elif hrv_ratio > 1.2:
+        # Saturation Spike (>120%)
+        # Penalize: 100 -> 50 for 1.2->1.4
+        excess = hrv_ratio - 1.2
+        hrv_score = max(0, 100 - (excess * 250)) # e.g. 0.2 excess (1.4 ratio) -> 50 pts off
+    else:
+        # Sympathetic Drop (<90%)
+        # Penalize: 100 -> 0 for 0.9->0.7
+        deficit = 0.9 - hrv_ratio
+        hrv_score = max(0, 100 - (deficit * 500)) # e.g. 0.2 deficit (0.7 ratio) -> 100 pts off
+
+    # 3. Stress Score (Age Corrected)
+    # Correction Factor: 1.15x
+    adj_stress = raw_stress * 1.15
+    
+    if adj_stress <= GOLDEN_STRESS_MEAN:
+        stress_score = 100
+    else:
+        # Linear penalty for excess stress
+        # e.g. Stress 50 vs Baseline 35 -> Diff 15 -> Score 70
+        diff = adj_stress - GOLDEN_STRESS_MEAN
+        stress_score = max(0, 100 - (diff * 2))
+
+    # --- Final Weighted Score ---
+    final_score = (rhr_score * WEIGHT_RHR) + (hrv_score * WEIGHT_HRV) + (stress_score * WEIGHT_STRESS)
+    
+    # --- VETO PROTOCOL ---
+    veto_msg = None
+    if daily_status == "RED":
+        final_score = 40
+        veto_msg = "⚠️ Score Vetoed: System Crash Detected."
+    elif daily_status == "YELLOW":
+        if final_score > 75:
+            final_score = 75
+            veto_msg = "⚠️ Score Capped at 75% due to Caution status."
+            
+    return {
+        "score": round(final_score, 1),
+        "veto_msg": veto_msg,
+        "details": {
+            "rhr": {
+                "val": round(current_rhr, 1), 
+                "z_score": round(rhr_z, 2), 
+                "score": round(rhr_score, 1)
+            },
+            "hrv": {
+                "val": round(hrv_today, 1), 
+                "7d_avg": round(hrv_7d, 1), 
+                "ratio": round(hrv_ratio, 2), 
+                "score": round(hrv_score, 1)
+            },
+            "stress": {
+                "raw": round(raw_stress, 1), 
+                "adj": round(adj_stress, 1), 
+                "score": round(stress_score, 1)
+            }
+        }
+    }
+
 def calculate_metrics():
     """
     Query databases and apply strict logic rules for the dashboard.
@@ -371,7 +525,18 @@ def calculate_metrics():
 def index():
     is_fresh, last_data, last_hrv, last_sleep, is_sleep_today = check_freshness()
     metrics = calculate_metrics()
-    return render_template('index.html', fresh=is_fresh, last_data=last_data, last_hrv=last_hrv, last_sleep=last_sleep, metrics=metrics)
+    daily_status = metrics['final_verdict']['status']
+    
+    # Calculate Recovery Score
+    recovery_score = None
+    try:
+        conn = get_db_connection(GARMIN_DB)
+        recovery_score = get_recovery_score(conn, daily_status)
+        conn.close()
+    except Exception as e:
+        print(f"Error calculating recovery score: {e}")
+        
+    return render_template('index.html', fresh=is_fresh, last_data=last_data, last_hrv=last_hrv, last_sleep=last_sleep, metrics=metrics, recovery=recovery_score)
 
 @app.route('/sync', methods=['POST'])
 def sync():
