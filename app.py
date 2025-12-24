@@ -86,14 +86,20 @@ def check_freshness():
         conn.close()
         
         if row and row['last_day']:
+            today = datetime.now().date()
+            yesterday = today - timedelta(days=1)
             last_day = datetime.strptime(row['last_day'], '%Y-%m-%d').date()
-            # If data is from today, it's fresh.
-            if last_day == datetime.now().date():
+            
+            # Fresh if it's today
+            if last_day == today:
                 return True
-            # If it's early morning (e.g. before 10 AM) and we have yesterday's data, maybe consider it "fresh enough" 
-            # or just let the user sync. For now, strict 'today' check as per requirements.
+                
+            # Or if it's early morning (before 10 AM) and we have yesterday's data
+            is_morning = datetime.now().hour < 10
+            if is_morning and last_day == yesterday:
+                return True
     except Exception as e:
-        print(f"Error checking freshness: {e}")
+        print(f"Error checking freshness: {e}", flush=True)
     return False
 
 def calculate_metrics():
@@ -228,16 +234,38 @@ def sync():
     Trigger the sync script.
     """
     try:
+        print(f"[{datetime.now()}] Starting sync triggered via web...", flush=True)
         # Check if script exists
         if not os.path.exists(SYNC_SCRIPT):
-             return jsonify({"status": "error", "message": "Sync script not found"}), 404
+             print(f"[{datetime.now()}] ERROR: Sync script not found at {SYNC_SCRIPT}", flush=True)
+             return jsonify({"status": "error", "message": f"Sync script not found at {SYNC_SCRIPT}"}), 404
 
-        # Run script
-        subprocess.run([SYNC_SCRIPT], check=True, capture_output=True)
-        return jsonify({"status": "success", "message": "Sync completed"})
-    except subprocess.CalledProcessError as e:
-        return jsonify({"status": "error", "message": f"Sync failed: {e}"}), 500
+        # Run script with Popen for real-time streaming
+        print(f"[{datetime.now()}] Executing: {SYNC_SCRIPT}", flush=True)
+        process = subprocess.Popen(
+            [SYNC_SCRIPT], 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.STDOUT, 
+            text=True,
+            bufsize=1,
+            universal_newlines=True
+        )
+        
+        # Read output in real-time
+        for line in process.stdout:
+            print(f"[{datetime.now()}] SYNC: {line.strip()}", flush=True)
+            
+        process.wait()
+        
+        if process.returncode == 0:
+            print(f"[{datetime.now()}] Sync completed successfully.", flush=True)
+            return jsonify({"status": "success", "message": "Sync completed"})
+        else:
+            print(f"[{datetime.now()}] ERROR: Sync failed with exit code {process.returncode}", flush=True)
+            return jsonify({"status": "error", "message": f"Sync failed with exit code {process.returncode}"}), 500
+
     except Exception as e:
+        print(f"[{datetime.now()}] UNEXPECTED ERROR: {e}", flush=True)
         return jsonify({"status": "error", "message": f"An error occurred: {e}"}), 500
 
 @app.route('/api/data')

@@ -137,12 +137,18 @@
                          Let's simple verify: hx-post="/sync" -> on htmx:afterRequest -> reload.
                     -->
                     <script>
+                        document.body.addEventListener('htmx:beforeRequest', function(evt) {
+                            if(evt.detail.elt.getAttribute('hx-post') === '/sync') {
+                                document.getElementById('syncOverlay').style.display = 'flex';
+                            }
+                        });
                         document.body.addEventListener('htmx:afterRequest', function(evt) {
                             if(evt.detail.elt.getAttribute('hx-post') === '/sync') {
                                 if(evt.detail.successful) {
                                     window.location.reload();
                                 } else {
-                                    alert('Sync failed!');
+                                    document.getElementById('syncOverlay').style.display = 'none';
+                                    alert('Sync failed! Check logs in /tmp/tree_recovery.log');
                                 }
                             }
                         });
@@ -156,6 +162,21 @@
                 </div>
             </div>
         </header>
+
+        <!-- Sync Overlay -->
+        <div id="syncOverlay" class="position-fixed top-0 start-0 w-100 h-100 flex-column align-items-center justify-content-center" 
+             style="display: none; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); z-index: 9999;">
+            <div class="glass-panel p-5 text-center" style="max-width: 400px; border-color: var(--accent-green);">
+                <div class="spinner-border text-primary mb-4" style="width: 3rem; height: 3rem;" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h3 class="fw-bold mb-3">Syncing Biometrics</h3>
+                <p class="text-secondary mb-0">Fetching latest data from Garmin. This process can take 1-2 minutes depending on your connection.</p>
+                <div class="mt-4 small text-secondary italic">
+                    <i class="bi bi-info-circle me-1"></i> Check terminal logs for detailed progress
+                </div>
+            </div>
+        </div>
 
         <!-- Morning Briefing Grid -->
         <h5 class="text-secondary mb-3 ps-2">Physiological Status</h5>
