@@ -10,7 +10,7 @@ app = Flask(__name__)
 DB_DIR = os.path.expanduser("/Users/joelgerard/tree_home/HealthData/DBs")
 GARMIN_DB = os.path.join(DB_DIR, "garmin.db")
 GARMIN_ACTIVITIES_DB = os.path.join(DB_DIR, "garmin_activities.db")
-GARMIN_HRV_DB = os.path.join(DB_DIR, "garmin_hrv.db")
+# Note: HRV data is now expected in garmin.db
 SYNC_SCRIPT = os.path.expanduser("/Users/joelgerard/tree_home/export_garmin.sh")
 
 def get_db_connection(db_path):
@@ -64,13 +64,14 @@ def get_resting_hr(day_date):
 
 def get_hrv_data(day_date):
     try:
-        conn = get_db_connection(GARMIN_HRV_DB)
+        conn = get_db_connection(GARMIN_DB)
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM hrv_daily WHERE date = ?", (day_date.isoformat(),))
+        cursor.execute("SELECT * FROM hrv WHERE day = ?", (day_date.isoformat(),))
         row = cursor.fetchone()
         conn.close()
         return row
-    except Exception:
+    except Exception as e:
+        print(f"Error fetching HRV data for {day_date}: {e}")
         return None
 
 def check_freshness():
@@ -92,13 +93,13 @@ def check_freshness():
             last_summary_date = datetime.strptime(row['last_day'], '%Y-%m-%d').date()
 
         # Check HRV
-        conn_hrv = get_db_connection(GARMIN_HRV_DB)
+        conn_hrv = get_db_connection(GARMIN_DB)
         cursor_hrv = conn_hrv.cursor()
-        cursor_hrv.execute("SELECT MAX(date) as last_date FROM hrv_daily")
+        cursor_hrv.execute("SELECT MAX(day) as last_day FROM hrv")
         row_hrv = cursor_hrv.fetchone()
         conn_hrv.close()
-        if row_hrv and row_hrv['last_date']:
-            last_hrv_date = datetime.strptime(row_hrv['last_date'], '%Y-%m-%d').date()
+        if row_hrv and row_hrv['last_day']:
+            last_hrv_date = datetime.strptime(row_hrv['last_day'], '%Y-%m-%d').date()
 
         today = datetime.now().date()
         yesterday = today - timedelta(days=1)
@@ -169,8 +170,8 @@ def calculate_metrics():
     hrv_row = get_hrv_data(today)
     
     if rhr is not None and hrv_row:
-        hrv_val = hrv_row['overnight_hrv']
-        seven_day = hrv_row['seven_day_avg']
+        hrv_val = hrv_row['last_night_avg']
+        seven_day = hrv_row['weekly_avg']
         
         # Rule: If RHR > 53 bpm OR HRV < [7-day-avg minus 5ms]
         is_stress = False

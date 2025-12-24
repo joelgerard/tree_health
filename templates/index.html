@@ -175,13 +175,43 @@
             display: none;
         }
 
+
         .htmx-request .loader {
             display: inline-block;
+        }
+
+        .encouragement-banner {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-bottom: 2px solid var(--accent-green);
+            padding: 1rem;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2rem;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
     </style>
 </head>
 
-<body class="py-4">
+<body class="py-0">
+    <div class="encouragement-banner">
+        YOU CAN DO IT TREE! ❤️ JOEL
+    </div>
     <div class="rain-container" id="rain"></div>
     <img src="{{ url_for('static', filename='images/unicorn.png') }}" class="unicorn-corner" alt="Magical Unicorn">
 
