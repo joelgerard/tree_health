@@ -15,6 +15,33 @@ GARMIN_ACTIVITIES_DB = os.path.join(DB_DIR, "garmin_activities.db")
 # Note: HRV data is now expected in garmin.db
 SYNC_SCRIPT = os.path.expanduser("/Users/joelgerard/tree_home/export_garmin.sh")
 
+# --- DYNAMIC CONFIGURATION ---
+# The Garmin algorithms are currently skewed due to the Dec 23 age change.
+# This block forces Raw Data analysis until Jan 20, 2026.
+
+current_date = datetime.now().date()
+RECALIBRATION_DATE = datetime(2026, 1, 20).date()
+
+if current_date < RECALIBRATION_DATE:
+    # --- PHASE 1: RAW SENSOR MODE (Active Now) ---
+    print("⚠️  GARMIN AGE SKEW DETECTED: Enforcing Raw Biometric Limits.")
+    USE_GARMIN_ZONES = False
+    
+    # Values derived from Sensitivity Analysis:
+    STEP_CAP_LAG = 5000
+    HR_MAX_CAP = 102
+    
+else:
+    # --- PHASE 2: ALGORITHM MODE (Active after Jan 20) ---
+    print("✅  GARMIN CALIBRATION COMPLETE: Re-enabling Zone Analysis.")
+    USE_GARMIN_ZONES = True
+    
+    # Standard Baselines (Relaxed):
+    STEP_CAP_LAG = 5000  # Default safe baseline
+    HR_MAX_CAP = 135     # Reverts to Zone 3/4 threshold
+
+# -----------------------------
+
 def get_db_connection(db_path):
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
@@ -154,16 +181,38 @@ def calculate_metrics():
         vigorous_t2_str = t2_data['vigorous_activity_time']
         vigorous_t2_mins = parse_time_str(vigorous_t2_str)
         
-        if steps_t2 > 5500 or vigorous_t2_mins > 20:
-            metrics["crash_predictor"] = {"status": "RED", "msg": "⚠️ High Risk: delayed fatigue from 2 days ago."}
+        # Crash Logic: 
+        # In Raw Mode (Phase 1), we ONLY look at Step Count (Raw). 
+        # We ignore Vigorous Activity because it relies on HR Zones (which are skewed).
+        
+        is_risk = False
+        risk_msg = ""
+        
+        if steps_t2 > STEP_CAP_LAG:
+            is_risk = True
+            risk_msg = "⚠️ High Risk: Step count delayed fatigue."
+            
+        if USE_GARMIN_ZONES:
+             if vigorous_t2_mins > 20:
+                 is_risk = True
+                 risk_msg = "⚠️ High Risk: Vigorous activity delayed fatigue."
+        
+        if is_risk:
+            metrics["crash_predictor"] = {"status": "RED", "msg": risk_msg if risk_msg else "⚠️ High Risk detected."}
             metrics["warnings_count"] += 1
 
     # --- Metric 2: Safety Ceiling (T-1) ---
     t1_data = get_daily_data(yesterday)
     if t1_data:
         steps_t1 = t1_data['steps'] or 0
-        if steps_t1 > 4500:
-            metrics["safety_ceiling"] = {"status": "YELLOW", "msg": "⚠️ Warning: You exceeded the safety cap yesterday."}
+        hr_max_t1 = t1_data['hr_max'] or 0
+        
+        # Check raw sensor limits
+        if steps_t1 > 4500 or hr_max_t1 > HR_MAX_CAP:
+            msg = "⚠️ Warning: You exceeded the safety cap yesterday."
+            if hr_max_t1 > HR_MAX_CAP:
+                msg += f" (HR Max {hr_max_t1} > {HR_MAX_CAP})"
+            metrics["safety_ceiling"] = {"status": "YELLOW", "msg": msg}
             metrics["warnings_count"] += 1
 
     # --- Metric 3: Autonomic Stress (Today/Yesterday) ---
