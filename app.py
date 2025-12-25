@@ -7,9 +7,18 @@ from flask import Flask, render_template, jsonify, request
 app = Flask(__name__)
 
 # Configuration
-# DB_DIR = os.path.expanduser("/Users/joelgerard/tree_home/HealthData/DBs")
+# Configuration
+DEFAULT_DB_DIR = os.path.expanduser("/Users/joelgerard/Library/CloudStorage/GoogleDrive-joelgerard@gmail.com/My Drive/joel health/tree health/DBs")
+LOCAL_CONFIG_PATH = os.path.expanduser("~/.tree_health_config")
 
-DB_DIR = os.path.expanduser("/Users/joelgerard/Library/CloudStorage/GoogleDrive-joelgerard@gmail.com/My Drive/joel health/tree health/DBs")
+if os.environ.get("TREE_HEALTH_DB_DIR"):
+    DB_DIR = os.path.expanduser(os.environ["TREE_HEALTH_DB_DIR"])
+elif os.path.exists(LOCAL_CONFIG_PATH):
+    with open(LOCAL_CONFIG_PATH, 'r') as f:
+        DB_DIR = os.path.expanduser(f.read().strip())
+else:
+    DB_DIR = DEFAULT_DB_DIR
+
 GARMIN_DB = os.path.join(DB_DIR, "garmin.db")
 GARMIN_ACTIVITIES_DB = os.path.join(DB_DIR, "garmin_activities.db")
 # Note: HRV data is now expected in garmin.db
