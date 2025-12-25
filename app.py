@@ -362,197 +362,118 @@ def get_recovery_score(conn, daily_status, target_date=None):
         }
     }
 
-def calculate_metrics(target_date=None, conn=None, conn_activities=None):
+def calculate_metrics(target_date, conn, conn_activities):
     """
-    Query databases and apply strict logic rules for the dashboard.
+    The Core Logic Engine.
+    Returns: 'RED', 'YELLOW', 'GREEN' based on Dec 25 Protocols.
+    Updated: Enforces 'Freeze Protocol' and reduces 'Zombie Walk' sensitivity.
     """
-    today = target_date if target_date else datetime.now().date()
-    yesterday = today - timedelta(days=1)
-    two_days_ago = today - timedelta(days=2)
-
-    metrics = {
-        "crash_predictor": {"status": "GREEN", "msg": "No risk detected"},
-        "safety_ceiling": {"status": "GREEN", "msg": "Within limits"},
-        "autonomic_stress": {"status": "GREEN", "msg": "Normal"},
-        "sleep_recharge": {"status": "GREEN", "msg": "Good recharge"},
-        "efficiency_check": {"status": "GREEN", "msg": "Efficient movement"},
-        "respiration_warning": {"status": "GREEN", "msg": "Stable breathing"},
-        "final_verdict": {"status": "GREEN", "msg": "Safe to proceed", "target": "4,500 Steps"},
-        "warnings_count": 0
-    }
-
-    # --- Metric 1: Crash Predictor (T-2) ---
-    t2_data = get_daily_data(two_days_ago, conn)
-    if t2_data:
-        steps_t2 = t2_data['steps'] or 0
-        vigorous_t2_str = t2_data['vigorous_activity_time']
-        vigorous_t2_mins = parse_time_str(vigorous_t2_str)
-        
-        # Crash Logic: 
-        # In Raw Mode (Phase 1), we ONLY look at Step Count (Raw). 
-        # We ignore Vigorous Activity because it relies on HR Zones (which are skewed).
-        
-        is_risk = False
-        risk_msg = ""
-        
-        if steps_t2 > STEP_CAP_LAG:
-            is_risk = True
-            risk_msg = "⚠️ High Risk: Step count delayed fatigue."
-            
-        if USE_GARMIN_ZONES:
-             if vigorous_t2_mins > 20:
-                 is_risk = True
-                 risk_msg = "⚠️ High Risk: Vigorous activity delayed fatigue."
-        
-        if is_risk:
-            metrics["crash_predictor"] = {"status": "RED", "msg": risk_msg if risk_msg else "⚠️ High Risk detected."}
-            metrics["warnings_count"] += 1
-
-    # --- Metric 2: Safety Ceiling (T-1) ---
-    t1_data = get_daily_data(yesterday, conn)
-    if t1_data:
-        steps_t1 = t1_data['steps'] or 0
-        hr_max_t1 = t1_data['hr_max'] or 0
-        
-        # Check raw sensor limits
-        if steps_t1 > 4500 or hr_max_t1 > HR_MAX_CAP:
-            msg = "⚠️ Warning: You exceeded the safety cap yesterday."
-            if hr_max_t1 > HR_MAX_CAP:
-                msg += f" (HR Max {hr_max_t1} > {HR_MAX_CAP})"
-            metrics["safety_ceiling"] = {"status": "YELLOW", "msg": msg}
-            metrics["warnings_count"] += 1
-
-    # --- Metric 3: Autonomic Stress (Today/Yesterday) ---
-    # RHR usually has today's value if sync happened, but might rely on yesterday's if morning.
-    # Requirement says: Query `overnight_hrv` (last night) and `resting_heart_rate` (yesterday/today).
-    # We'll try today's RHR first, then yesterday's? "resting_heart_rate (yesterday/today)" usually implies latest available.
-    # Let's try today first.
-    rhr = get_resting_hr(today, conn)
-    if rhr is None:
-        rhr = get_resting_hr(yesterday, conn)
+    cursor = conn.cursor()
     
-    # HRV for "Last Night" is usually logged with Today's date in Garmin exports (Sleep date).
-    # Let's verify this assumption. Usually "Overnight HRV" for the sleep ending today is dated Today.
-    hrv_row = get_hrv_data(today, conn)
+    # 1. Fetch Key Metrics
+    cursor.execute("SELECT resting_heart_rate, hr_max, bb_charged, stress_avg FROM daily_summary WHERE day = ?", (target_date,))
+    row = cursor.fetchone()
     
-    if rhr is not None and hrv_row:
-        hrv_val = hrv_row['last_night_avg']
-        seven_day = hrv_row['weekly_avg']
+    if not row:
+        return {"status": "GRAY", "reason": "No Data", "target_steps": 0, "metrics": {}}
         
-        # Rule: If RHR > 53 bpm OR HRV < [7-day-avg minus 5ms]
-        is_stress = False
-        if rhr > 53:
-            is_stress = True
-        if hrv_val and seven_day and (hrv_val < (seven_day - 5)):
-            is_stress = True
-            
-        if is_stress:
-            metrics["autonomic_stress"] = {"status": "RED", "msg": "❤️ Physiological Stress detected."}
-            metrics["warnings_count"] += 1
+    rhr = row['resting_heart_rate']
+    bb_charged = row['bb_charged']
     
-    # --- Metric 4: Sleep Recharge (Today) ---
-    # Looking for BB Charged from last night's sleep (Today's summary)
-    today_data = get_daily_data(today, conn)
-    metrics["today_data_available"] = False
+    # --- GOLDEN ERA BASELINES (Mar-May 2025) ---
+    BASELINE_RHR = 50.6
     
-    if today_data:
-        metrics["today_data_available"] = True
-        bb_charged = today_data['bb_charged']
-        # Rule: If bb_charged < 50
-        if bb_charged is not None and bb_charged < 50:
-            metrics["sleep_recharge"] = {"status": "YELLOW", "msg": "🔋 Poor Recharge."}
-            # Note: The prompt implies this contributes to the verdict. 
-            # "If 2+ warnings or High RHR".
-            # Is "Poor Recharge" a warning? 
-            # Prompt says "High Risk" (Metric 1), "Warning" (Metric 2), "Physiological Stress" (Metric 3).
-            # "Poor Recharge" (Metric 4).
-            # Let's count it as a warning for now.
-            metrics["warnings_count"] += 1
-
-
-
-    # --- Metric 5: Efficiency Check (Cadence Cost T-1) ---
-    # Low Cadence yesterday (<90 spm total, ~45 1-foot) -> Fatigue Risk Today
-    activities_t1 = get_activities(yesterday, conn_activities)
-    if activities_t1:
-        for act in activities_t1:
-            cadence = act['avg_cadence'] # 1-foot cadence from DB
-            if cadence and cadence > 0 and cadence < 45:
-                # 45 * 2 = 90 spm threshold
-                metrics["efficiency_check"] = {"status": "YELLOW", "msg": "⚠️ Inefficient Movement (Shuffling) detected yesterday."}
-                metrics["warnings_count"] += 1
-                break
-
-    # --- Metric 6: Respiration Early Warning (T-1 vs T-2) ---
-    # Rise in RR > 1.0 brpm predicts crash
-    if t1_data and t2_data:
-        rr_t1 = t1_data['rr_waking_avg']
-        rr_t2 = t2_data['rr_waking_avg']
+    warnings = []
+    red_flags = []
+    
+    # --- LOGIC GATE 1: THE ENGINE (RHR) ---
+    # Sympathetic Stress (Too High)
+    if rhr and rhr > (BASELINE_RHR + 3):  # > 53.6 bpm
+        red_flags.append(f"High RHR (+{round(rhr - BASELINE_RHR, 1)})")
         
-        if rr_t1 and rr_t2:
-            rr_delta = rr_t1 - rr_t2
-            if rr_delta > 1.0:
-                metrics["respiration_warning"] = {"status": "YELLOW", "msg": f"⚠️ Elevated Breathing (+{rr_delta:.1f} brpm) detected."}
-                metrics["warnings_count"] += 1
+    # Parasympathetic Freeze (Too Low) - THE NEW CRITICAL CHECK
+    elif rhr and rhr < (BASELINE_RHR - 2.5): # < 48.1 bpm
+        red_flags.append(f"Metabolic Freeze Detected (RHR {rhr})")
+
+    # --- LOGIC GATE 2: THE BATTERY ---
+    if bb_charged and bb_charged < 50:
+        red_flags.append(f"Poor Recharge (Max {bb_charged}%)")
+        
+    # --- LOGIC GATE 3: MOVEMENT INEFFICIENCY (The Zombie Walk) ---
+    # Downgraded to YELLOW based on V2 Analysis (Noise reduction)
+    cursor_act = conn_activities.cursor()
+    # Get walks from yesterday (T-1)
+    yesterday = (datetime.strptime(target_date, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
+    
+    try:
+        cursor_act.execute("""
+            SELECT AVG(cadence) as avg_cad, MAX(inefficiency_score) as max_ineff 
+            FROM activity_records 
+            WHERE date = ? AND activity_type = 'walking'
+        """, (yesterday,))
+        act_row = cursor_act.fetchone()
+        
+        if act_row and act_row['max_ineff'] and act_row['max_ineff'] > 50:
+            warnings.append("Inefficient Movement (Shuffle)")
+    except Exception as e:
+        print(f"Warning: Could not fetch activity data: {e}")
+
 
     # --- Final Verdict ---
-    # Collect reasons
-    reasons = []
-    
-    # Check individual metrics for non-GREEN status
-    if metrics["crash_predictor"]["status"] != "GREEN":
-        reasons.append("T-2 Fatigue Trigger")
-    if metrics["safety_ceiling"]["status"] != "GREEN":
-        reasons.append("Safety Ceiling Exceeded")
-    if metrics["autonomic_stress"]["status"] != "GREEN":
-        reasons.append("Physiological Stress")
-    if metrics["sleep_recharge"]["status"] != "GREEN":
-        reasons.append("Poor Sleep Recharge")
-    if metrics["efficiency_check"]["status"] != "GREEN":
-        reasons.append("Inefficient Movement")
-    if metrics["respiration_warning"]["status"] != "GREEN":
-        reasons.append("Elevated Breathing")
-
-    # RHR Override Reason
-    rhr_high = False
-    if rhr and rhr > 53:
-        rhr_high = True
-        if "Physiological Stress" not in reasons:
-            reasons.append("High RHR (>53)")
-
-    warnings = metrics["warnings_count"]
-    
-    if warnings >= 2 or rhr_high:
-        base_msg = "🛑 STOP. Rest Day."
-        if rhr_high:
-             base_msg = "🛑 STOP. High RHR detected."
-             
-        reason_str = ", ".join(reasons)
-        metrics["final_verdict"] = {
-            "status": "RED", 
-            "msg": f"{base_msg} Reasons: {reason_str}. Target: <1,500 Steps.",
-            "target": "< 1,500 Steps"
-        }
-    elif warnings == 1:
-        reason_str = ", ".join(reasons)
-        metrics["final_verdict"] = {
-            "status": "YELLOW", 
-            "msg": f"⚠️ Caution. Reasons: {reason_str}. Target: 3,000 Steps.",
-            "target": "3,000 Steps"
-        }
+    if len(red_flags) > 0:
+        status = "RED"
+        reason = "STOP. " + ", ".join(red_flags)
+        target_steps = 1500
+    elif len(warnings) >= 1:
+        status = "YELLOW"
+        reason = "CAUTION. " + ", ".join(warnings)
+        target_steps = 3000
     else:
-        metrics["final_verdict"] = {
-            "status": "GREEN", 
-            "msg": "✅ Safe to proceed. Target: 4,500 Steps.",
-            "target": "4,500 Steps"
-        }
-
-    return metrics
+        status = "GREEN"
+        reason = "Go for it. Maintain pacing."
+        target_steps = 4500
+        
+    return {
+        "status": status,
+        "reason": reason,
+        "target_steps": target_steps,
+        "metrics": {"rhr": rhr, "bb": bb_charged}
+    }
 
 @app.route('/')
 def index():
     is_fresh, last_data, last_hrv, last_sleep, is_sleep_today = check_freshness()
-    metrics = calculate_metrics()
+    
+    # New Logic: Needs connections and string date
+    metrics_raw = None
+    try:
+        conn = get_db_connection(GARMIN_DB)
+        conn_activities = get_db_connection(GARMIN_ACTIVITIES_DB)
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        metrics_raw = calculate_metrics(today_str, conn, conn_activities)
+        conn.close()
+        conn_activities.close()
+    except Exception as e:
+        print(f"Error calculating metrics in index: {e}")
+        metrics_raw = {"status": "GRAY", "reason": f"Error: {e}", "target_steps": 0, "metrics": {}}
+
+    # Adapter for index.html (which expects old structure)
+    metrics = {
+        "final_verdict": {
+            "status": metrics_raw["status"],
+            "msg": metrics_raw["reason"],
+            "target": f"{metrics_raw['target_steps']:,} Steps"
+        },
+        # Deprecated metrics set to hidden/neutral state
+        "crash_predictor": {"status": "GRAY", "msg": "Analysis Deprecated"},
+        "safety_ceiling": {"status": "GRAY", "msg": "Analysis Deprecated"},
+        "autonomic_stress": {"status": "GRAY", "msg": "Analysis Deprecated"},
+        "sleep_recharge": {"status": "GRAY", "msg": "Analysis Deprecated"},
+        "efficiency_check": {"status": "GRAY", "msg": "Analysis Deprecated"},
+        "respiration_warning": {"status": "GRAY", "msg": "Analysis Deprecated"},
+        "today_data_available": True if metrics_raw['metrics'].get('rhr') else False
+    }
+
     daily_status = metrics['final_verdict']['status']
     
     # Calculate Recovery Score
@@ -704,8 +625,13 @@ def api_recovery_history():
             # 1. Get Daily Status (for Veto)
             try:
                 # Reuse connections for performance
-                metrics = calculate_metrics(target_date=current, conn=conn, conn_activities=conn_activities)
-                daily_status = metrics['final_verdict']['status']
+                # Pass as STRING '%Y-%m-%d'
+                try:
+                    metrics = calculate_metrics(date_str, conn, conn_activities)
+                    daily_status = metrics['status']
+                except Exception as inner_e:
+                    print(f"Warning: calculate_metrics failed for {date_str}: {inner_e}")
+                    daily_status = "GREEN" # Fallback
             except Exception as e:
                 print(f"Error calculating metrics for {date_str}: {e}")
                 daily_status = "GREEN" # Fallback
