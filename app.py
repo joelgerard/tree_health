@@ -371,13 +371,13 @@ def calculate_metrics(target_date, conn, conn_activities):
     cursor = conn.cursor()
     
     # 1. Fetch Key Metrics
-    cursor.execute("SELECT resting_heart_rate, hr_max, bb_charged, stress_avg FROM daily_summary WHERE day = ?", (target_date,))
+    cursor.execute("SELECT rhr, hr_max, bb_charged, stress_avg FROM daily_summary WHERE day = ?", (target_date,))
     row = cursor.fetchone()
     
     if not row:
         return {"status": "GRAY", "reason": "No Data", "target_steps": 0, "metrics": {}}
         
-    rhr = row['resting_heart_rate']
+    rhr = row['rhr']
     bb_charged = row['bb_charged']
     
     # --- GOLDEN ERA BASELINES (Mar-May 2025) ---
