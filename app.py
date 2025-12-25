@@ -364,14 +364,16 @@ def get_recovery_score(conn, daily_status, target_date=None):
 
 def calculate_metrics(target_date, conn, conn_activities):
     """
-    The Core Logic Engine.
-    Returns: 'RED', 'YELLOW', 'GREEN' based on Dec 25 Protocols.
-    Updated: Enforces 'Freeze Protocol' and reduces 'Zombie Walk' sensitivity.
+    The Core Logic Engine (FINAL VERSION).
+    Combines:
+    1. Freeze Protocol (Low RHR).
+    2. Lag 2 Protocol (Delayed PEM).
+    3. Zombie Protocol (Downgraded to Caution).
     """
     cursor = conn.cursor()
     
     # 1. Fetch Key Metrics
-    cursor.execute("SELECT rhr, hr_max, bb_charged, stress_avg FROM daily_summary WHERE day = ?", (target_date,))
+    cursor.execute("SELECT rhr, hr_max, bb_charged, stress_avg, steps FROM daily_summary WHERE day = ?", (target_date,))
     row = cursor.fetchone()
     
     if not row:
@@ -398,11 +400,24 @@ def calculate_metrics(target_date, conn, conn_activities):
     # --- LOGIC GATE 2: THE BATTERY ---
     if bb_charged and bb_charged < 50:
         red_flags.append(f"Poor Recharge (Max {bb_charged}%)")
-        
-    # --- LOGIC GATE 3: MOVEMENT INEFFICIENCY (The Zombie Walk) ---
-    # Downgraded to YELLOW based on V2 Analysis (Noise reduction)
+
+    # --- LOGIC GATE 3: THE LAG 2 PREDICTOR (Restored) ---
+    # Check T-2 (Two days ago) for overload
+    day_t2 = (datetime.strptime(target_date, '%Y-%m-%d') - timedelta(days=2)).strftime('%Y-%m-%d')
+    cursor.execute("SELECT steps, hr_max FROM daily_summary WHERE day = ?", (day_t2,))
+    row_t2 = cursor.fetchone()
+    
+    if row_t2:
+        # If she exceeded 5000 steps 48 hours ago, today is the Crash Day.
+        if row_t2['steps'] and row_t2['steps'] > 5000:
+            red_flags.append(f"Lag 2 Impact (High Load on {day_t2})")
+        # Optional: HR Spike T-2 check
+        if row_t2['hr_max'] and row_t2['hr_max'] > 110:
+            warnings.append(f"Lag 2 HR Spike ({day_t2})")
+
+    # --- LOGIC GATE 4: MOVEMENT INEFFICIENCY (The Zombie Walk) ---
+    # Downgraded to YELLOW (Caution)
     cursor_act = conn_activities.cursor()
-    # Get walks from yesterday (T-1)
     yesterday = (datetime.strptime(target_date, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
     
     try:
@@ -416,10 +431,9 @@ def calculate_metrics(target_date, conn, conn_activities):
         if act_row and act_row['max_ineff'] and act_row['max_ineff'] > 50:
             warnings.append("Inefficient Movement (Shuffle)")
     except Exception as e:
-        print(f"Warning: Could not fetch activity data: {e}")
+        print(f"Warning: Activity fetch failed: {e}")
 
-
-    # --- Final Verdict ---
+    # --- FINAL VERDICT ---
     if len(red_flags) > 0:
         status = "RED"
         reason = "STOP. " + ", ".join(red_flags)
