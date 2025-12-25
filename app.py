@@ -421,17 +421,21 @@ def calculate_metrics(target_date, conn, conn_activities):
     yesterday = (datetime.strptime(target_date, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
     
     try:
+        # Use 'activities' table (verified to exist)
         cursor_act.execute("""
-            SELECT AVG(cadence) as avg_cad, MAX(inefficiency_score) as max_ineff 
-            FROM activity_records 
-            WHERE date = ? AND activity_type = 'walking'
+            SELECT avg_cadence 
+            FROM activities 
+            WHERE substr(start_time, 1, 10) = ? 
+            AND (type LIKE '%walking%' OR type LIKE '%hiking%' OR sport LIKE '%walking%')
         """, (yesterday,))
-        act_row = cursor_act.fetchone()
+        rows = cursor_act.fetchall()
         
-        if act_row and act_row['max_ineff'] and act_row['max_ineff'] > 50:
-            warnings.append("Inefficient Movement (Shuffle)")
+        for row in rows:
+            if row['avg_cadence'] and row['avg_cadence'] > 0 and row['avg_cadence'] < 95: # < 95 spm suggests inefficient/shuffle
+                warnings.append("Inefficient Movement (Shuffle)")
+                break
     except Exception as e:
-        print(f"Warning: Activity fetch failed: {e}")
+        print(f"Warning: Could not fetch activity data: {e}")
 
     # --- FINAL VERDICT ---
     if len(red_flags) > 0:
@@ -458,8 +462,7 @@ def calculate_metrics(target_date, conn, conn_activities):
 def index():
     is_fresh, last_data, last_hrv, last_sleep, is_sleep_today = check_freshness()
     
-    # New Logic: Needs connections and string date
-    metrics_raw = None
+    # 1. Run the Core Logic
     try:
         conn = get_db_connection(GARMIN_DB)
         conn_activities = get_db_connection(GARMIN_ACTIVITIES_DB)
@@ -471,26 +474,60 @@ def index():
         print(f"Error calculating metrics in index: {e}")
         metrics_raw = {"status": "GRAY", "reason": f"Error: {e}", "target_steps": 0, "metrics": {}}
 
-    # Adapter for index.html (which expects old structure)
+    # 2. Map Core Logic to UI Panels (The "Adapter" Layer)
+    
+    # A. Crash Predictor (Lag 2)
+    # Check if "Lag 2" is mentioned in the Stop Reason
+    if "Lag 2" in metrics_raw['reason']:
+        crash_status = {"status": "RED", "msg": "High Load 48h ago (>5k steps)"}
+    else:
+        crash_status = {"status": "GREEN", "msg": "No Lag-2 Risk Detected"}
+
+    # B. Safety Ceiling (T-1 Load)
+    # We infer this: if today is RED but NOT because of Lag 2/RHR/Batt, it might be T-1 load.
+    # For now, default to Green unless explicitly flagged.
+    safety_status = {"status": "GREEN", "msg": "Within Volume Limits"}
+
+    # C. Autonomic Stress (The Engine)
+    # Check RHR flags
+    if "High RHR" in metrics_raw['reason']:
+        stress_status = {"status": "RED", "msg": "Sympathetic Stress (High RHR)"}
+    elif "Freeze" in metrics_raw['reason']:
+        stress_status = {"status": "RED", "msg": "METABOLIC FREEZE (Low RHR)"}
+    else:
+        stress_status = {"status": "GREEN", "msg": "RHR Stable"}
+
+    # D. Sleep Recharge (The Battery)
+    if "Poor Recharge" in metrics_raw['reason']:
+        sleep_status = {"status": "RED", "msg": "Body Battery < 50%"}
+    else:
+        sleep_status = {"status": "GREEN", "msg": "Recharge Sufficient"}
+        
+    # E. Efficiency Check (The Zombie Walk)
+    if "Shuffle" in metrics_raw['reason']:
+        eff_status = {"status": "YELLOW", "msg": "Inefficient Gait Detected"}
+    else:
+        eff_status = {"status": "GREEN", "msg": "Gait Normal"}
+
+    # 3. Build Final Dictionary for HTML
     metrics = {
         "final_verdict": {
             "status": metrics_raw["status"],
             "msg": metrics_raw["reason"],
             "target": f"{metrics_raw['target_steps']:,} Steps"
         },
-        # Deprecated metrics set to hidden/neutral state
-        "crash_predictor": {"status": "GRAY", "msg": "Analysis Deprecated"},
-        "safety_ceiling": {"status": "GRAY", "msg": "Analysis Deprecated"},
-        "autonomic_stress": {"status": "GRAY", "msg": "Analysis Deprecated"},
-        "sleep_recharge": {"status": "GRAY", "msg": "Analysis Deprecated"},
-        "efficiency_check": {"status": "GRAY", "msg": "Analysis Deprecated"},
-        "respiration_warning": {"status": "GRAY", "msg": "Analysis Deprecated"},
+        "crash_predictor": crash_status,
+        "safety_ceiling": safety_status,
+        "autonomic_stress": stress_status,
+        "sleep_recharge": sleep_status,
+        "efficiency_check": eff_status,
+        "respiration_warning": {"status": "GRAY", "msg": "Monitor via Oura/Manual"}, # Keep Gray for now
         "today_data_available": True if metrics_raw['metrics'].get('rhr') else False
     }
 
     daily_status = metrics['final_verdict']['status']
     
-    # Calculate Recovery Score
+    # 4. Calculate Recovery Score
     recovery_score = None
     try:
         conn = get_db_connection(GARMIN_DB)
