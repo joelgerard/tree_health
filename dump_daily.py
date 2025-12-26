@@ -2,7 +2,7 @@ import argparse
 import os
 import sqlite3
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import glob
 
 def get_db_connection(db_path):
@@ -33,7 +33,6 @@ def find_date_column(cursor, table_name):
         for col in columns:
             if 'date' in col.lower() or 'time' in col.lower():
                 # Avoid generic 'time' columns if they are just duration (like 'elapsed_time')
-                # Usually 'start_time', 'creation_date' etc. are good.
                 if 'elapsed' not in col.lower() and 'duration' not in col.lower() and 'zone' not in col.lower():
                     return col
     except Exception as e:
@@ -46,12 +45,9 @@ def dump_table(conn, table_name, date_str):
     date_col = find_date_column(cursor, table_name)
     
     if not date_col:
-        # print(f"  [Skipping] Table '{table_name}': No date column found.")
         return []
 
     # Construct query
-    # We use LIKE 'YYYY-MM-DD%' to catch both full dates and timestamps
-    # Need to quote table name to handle reserved words
     query = f"SELECT * FROM \"{table_name}\" WHERE \"{date_col}\" LIKE ?"
     
     try:
@@ -63,11 +59,13 @@ def dump_table(conn, table_name, date_str):
         return []
 
 def main():
-    parser = argparse.ArgumentParser(description="Dump daily health data to JSON.")
+    parser = argparse.ArgumentParser(description="Dump health data to JSON.")
     parser.add_argument('-f', '--folder', default=os.path.expanduser("~/HealthData/DBs/"), 
                         help="Directory containing the database files.")
     parser.add_argument('-d', '--date', default=datetime.now().strftime('%Y-%m-%d'),
-                        help="Date to dump (YYYY-MM-DD). Defaults to today.")
+                        help="Target date (YYYY-MM-DD). Defaults to today.")
+    parser.add_argument('-w', '--week', action='store_true',
+                        help="Dump the last 7 days ending on the target date.")
     
     args = parser.parse_args()
     
@@ -78,17 +76,21 @@ def main():
         print(f"Error: Directory not found: {db_dir}")
         return
 
-    print(f"Dumping data for {target_date} from {db_dir}...")
-    
-    output_data = {}
-    
-    # Verify date format
+    # Determine dates to dump
     try:
-        datetime.strptime(target_date, '%Y-%m-%d')
+        target_dt = datetime.strptime(target_date, '%Y-%m-%d')
     except ValueError:
         print("Error: Invalid date format. Use YYYY-MM-DD.")
         return
 
+    dates_to_dump = [target_date]
+    if args.week:
+        dates_to_dump = [(target_dt - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(6, -1, -1)]
+        print(f"Dumping 7 days of data ({dates_to_dump[0]} to {dates_to_dump[-1]}) from {db_dir}...")
+    else:
+        print(f"Dumping data for {target_date} from {db_dir}...")
+    
+    output_data = {}
     db_files = glob.glob(os.path.join(db_dir, "*.db"))
     
     if not db_files:
@@ -111,14 +113,19 @@ def main():
             tables = [row['name'] for row in cursor.fetchall()]
             
             for table in tables:
-                # Skip internal sqlite tables
                 if table.startswith('sqlite_'):
                     continue
-                    
-                rows = dump_table(conn, table, target_date)
-                if rows:
-                    db_data[table] = rows
-                    print(f"  Found {len(rows)} records in '{table}'")
+                
+                # Collect rows for all requested dates
+                all_rows = []
+                for date_str in dates_to_dump:
+                    rows = dump_table(conn, table, date_str)
+                    if rows:
+                        all_rows.extend(rows)
+                        
+                if all_rows:
+                    db_data[table] = all_rows
+                    print(f"  Found {len(all_rows)} records in '{table}'")
                 
         except sqlite3.Error as e:
             print(f"Error reading {db_name}: {e}")
@@ -128,9 +135,12 @@ def main():
         if db_data:
             output_data[db_name] = db_data
 
-    output_filename = f"health_dump_{target_date}.json"
+    # Determine output filename
+    if args.week:
+        output_filename = f"health_dump_week_ending_{target_date}.json"
+    else:
+        output_filename = f"health_dump_{target_date}.json"
     
-    # Save to current working directory
     try:
         with open(output_filename, 'w') as f:
             json.dump(output_data, f, indent=2, default=str)
