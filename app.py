@@ -382,7 +382,7 @@ def calculate_metrics(target_date, conn, conn_activities):
     cursor = conn.cursor()
     
     # 1. Fetch Key Metrics
-    cursor.execute("SELECT rhr, hr_max, bb_charged, stress_avg, steps FROM daily_summary WHERE day = ?", (target_date,))
+    cursor.execute("SELECT rhr, hr_max, bb_charged, stress_avg, steps, calories_active FROM daily_summary WHERE day = ?", (target_date,))
     row = cursor.fetchone()
     
     if not row:
@@ -390,9 +390,12 @@ def calculate_metrics(target_date, conn, conn_activities):
         
     rhr = row['rhr']
     bb_charged = row['bb_charged']
+    active_cals = row['calories_active']
+    steps = row['steps']
     
     # --- GOLDEN ERA BASELINES (Mar-May 2025) ---
     BASELINE_RHR = 50.6
+    BASELINE_COST = 29.0 # Active Calories per 1,000 Steps
     
     warnings = []
     red_flags = []
@@ -424,7 +427,17 @@ def calculate_metrics(target_date, conn, conn_activities):
         if row_t2['hr_max'] and row_t2['hr_max'] > 110:
             warnings.append(f"Lag 2 HR Spike ({day_t2})")
 
-    # --- LOGIC GATE 4: MOVEMENT INEFFICIENCY (The Zombie Walk) ---
+    # --- LOGIC GATE 4: PHYSIOLOGICAL COST (The Efficiency Check) ---
+    # Metric: Active Calories per 1,000 steps
+    # Baseline: ~29.0. Warning Threshold: +20% (34.8)
+    physio_cost = 0
+    if steps and steps > 0 and active_cals:
+        physio_cost = (active_cals / steps) * 1000
+        
+        if physio_cost > (BASELINE_COST * 1.2):
+            warnings.append(f"High Physiological Cost ({int(physio_cost)})")
+
+    # --- LOGIC GATE 5: MOVEMENT INEFFICIENCY (The Zombie Walk) ---
     # Downgraded to YELLOW (Caution)
     cursor_act = conn_activities.cursor()
     yesterday = (datetime.strptime(target_date, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
@@ -464,7 +477,7 @@ def calculate_metrics(target_date, conn, conn_activities):
         "status": status,
         "reason": reason,
         "target_steps": target_steps,
-        "metrics": {"rhr": rhr, "bb": bb_charged}
+        "metrics": {"rhr": rhr, "bb": bb_charged, "physio_cost": physio_cost}
     }
 
 @app.route('/')
@@ -518,6 +531,13 @@ def index():
     else:
         eff_status = {"status": "GREEN", "msg": "Gait Normal"}
 
+    # F. Physiological Cost
+    p_cost = metrics_raw['metrics'].get('physio_cost', 0)
+    if "High Physiological Cost" in metrics_raw['reason']:
+         p_cost_status = {"status": "YELLOW", "msg": "High Cost (>+20% Baseline)"}
+    else:
+         p_cost_status = {"status": "GREEN", "msg": "Efficiency Normal"}
+
     # 3. Build Final Dictionary for HTML
     metrics = {
         "final_verdict": {
@@ -530,6 +550,11 @@ def index():
         "autonomic_stress": stress_status,
         "sleep_recharge": sleep_status,
         "efficiency_check": eff_status,
+        "physio_cost": {
+            "status": p_cost_status["status"],
+            "msg": p_cost_status["msg"],
+            "val": round(p_cost, 1)
+        },
         "respiration_warning": {"status": "GRAY", "msg": "Monitor via Oura/Manual"}, # Keep Gray for now
         "today_data_available": True if metrics_raw['metrics'].get('rhr') else False
     }

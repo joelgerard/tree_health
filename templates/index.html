@@ -415,6 +415,21 @@
                     {% endif %}
                 </div>
             </div>
+            <!-- Metric 5: Physiological Cost -->
+            <div class="col-md-6 col-lg-3">
+                <div class="metric-card p-4 h-100">
+                    <div class="d-flex justify-content-between mb-3">
+                        <small class="text-secondary">Physiological Cost</small>
+                        <div class="status-indicator status-{{ metrics.physio_cost.status }}"></div>
+                    </div>
+                    <h5 class="card-title fw-normal mb-1 {{ 'text-' + metrics.physio_cost.status }}">
+                        {{ metrics.physio_cost.msg }}
+                    </h5>
+                    <p class="text-secondary small mt-2 mb-0">
+                        {{ metrics.physio_cost.val }} Cals/1k Steps
+                    </p>
+                </div>
+            </div>
         </div>
 
         <!-- Verdict Banner -->
