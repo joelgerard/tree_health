@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 import sqlite3
 import json
 from datetime import datetime, timedelta
@@ -68,6 +69,11 @@ def main():
                         help="Dump the last 7 days ending on the target date.")
     
     args = parser.parse_args()
+
+    # If no flags are provided, print help
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(0)
     
     db_dir = os.path.expanduser(args.folder)
     target_date = args.date
