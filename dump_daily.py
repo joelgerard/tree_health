@@ -59,6 +59,22 @@ def dump_table(conn, table_name, date_str):
         print(f"  [Error] Query failed for table '{table_name}' using col '{date_col}': {e}")
         return []
 
+def write_text_report(data, f):
+    for db_name, tables in data.items():
+        f.write("=" * 50 + "\n")
+        f.write(f"DATABASE: {db_name}\n")
+        f.write("=" * 50 + "\n\n")
+
+        for table_name, rows in tables.items():
+            f.write(f"--- TABLE: {table_name} ({len(rows)} records) ---\n\n")
+            
+            for i, row in enumerate(rows, 1):
+                f.write(f"[Record {i}]\n")
+                for key, value in row.items():
+                    if value is not None:
+                        f.write(f"  {key}: {value}\n")
+                f.write("\n")
+
 def main():
     parser = argparse.ArgumentParser(description="Dump health data to JSON.")
     parser.add_argument('-f', '--folder', default=os.path.expanduser("~/HealthData/DBs/"), 
@@ -67,6 +83,8 @@ def main():
                         help="Target date (YYYY-MM-DD). Defaults to today.")
     parser.add_argument('-w', '--week', action='store_true',
                         help="Dump the last 7 days ending on the target date.")
+    parser.add_argument('-t', '--text', action='store_true',
+                        help="Output in a human-readable text format instead of JSON.")
     
     args = parser.parse_args()
 
@@ -141,15 +159,20 @@ def main():
         if db_data:
             output_data[db_name] = db_data
 
-    # Determine output filename
+    # Determine output filename and extension
+    ext = "txt" if args.text else "json"
+    
     if args.week:
-        output_filename = f"health_dump_week_ending_{target_date}.json"
+        output_filename = f"health_dump_week_ending_{target_date}.{ext}"
     else:
-        output_filename = f"health_dump_{target_date}.json"
+        output_filename = f"health_dump_{target_date}.{ext}"
     
     try:
         with open(output_filename, 'w') as f:
-            json.dump(output_data, f, indent=2, default=str)
+            if args.text:
+                write_text_report(output_data, f)
+            else:
+                json.dump(output_data, f, indent=2, default=str)
         print(f"\nDump complete! Saved to {os.path.abspath(output_filename)}")
     except Exception as e:
         print(f"Error saving file: {e}")
