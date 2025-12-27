@@ -138,6 +138,8 @@ def get_smart_summary_for_date(db_dir, date_str):
                 data['metrics']['Stress Avg'] = daily.get('stress_avg')
                 data['metrics']['Body Battery'] = daily.get('bb_charged')
                 data['metrics']['Active Calories'] = daily.get('calories_active')
+                data['metrics']['Total Calories'] = daily.get('calories_total')
+                data['metrics']['BMR Calories'] = daily.get('calories_bmr')
 
             # HRV
             hrv = get_row_as_dict(cur, "SELECT * FROM hrv WHERE day = ?", (date_str,))
@@ -171,7 +173,38 @@ def get_smart_summary_for_date(db_dir, date_str):
                 })
             conn.close()
             
-    # 3. Visible (If available) - Placeholder / Best Effort
+            conn.close()
+            
+    # 3. High HR % from Monitoring (garmin_monitoring.db)
+    monitoring_db_path = os.path.join(db_dir, "garmin_monitoring.db")
+    if os.path.exists(monitoring_db_path):
+        conn = get_db_connection(monitoring_db_path)
+        if conn:
+            cur = conn.cursor()
+            # Count samples for the day
+            try:
+                # monitoring_hr often has 1s resolution. 
+                # timestamp is TEXT or DATETIME, hopefully standard ISO 'YYYY-MM-DD ...'
+                # We filter by LIKE 'YYYY-MM-DD%'
+                query = """
+                    SELECT 
+                        COUNT(*) as total,
+                        SUM(CASE WHEN heart_rate > 120 THEN 1 ELSE 0 END) as high_hr
+                    FROM monitoring_hr
+                    WHERE timestamp LIKE ?
+                """
+                cur.execute(query, (f"{date_str}%",))
+                row = cur.fetchone()
+                if row and row['total'] and row['total'] > 0:
+                    high_count = row['high_hr'] if row['high_hr'] else 0
+                    percent = (high_count / row['total']) * 100
+                    data['metrics']['High HR % (>120)'] = f"{percent:.1f}%"
+            except sqlite3.Error as e:
+                # Table might not exist or schema differs
+                pass
+            conn.close()
+
+    # 4. Visible (If available) - Placeholder / Best Effort
     # Note: If visible data is added later to a specific DB, add logic here.
     
     return data
