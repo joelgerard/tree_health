@@ -166,7 +166,8 @@ def get_smart_summary_for_date(db_dir, date_str):
                     'name': act.get('name', 'Unknown'),
                     'type': act.get('type', 'Unknown'),
                     'duration': format_duration(act.get('elapsed_time')),
-                    'avg_hr': act.get('avg_hr')
+                    'avg_hr': act.get('avg_hr'),
+                    'calories': act.get('calories')
                 })
             conn.close()
             
@@ -216,7 +217,10 @@ def write_smart_summary(dates, db_dir, output_file):
             f.write("ACTIVITIES:\n")
             if summary['activities']:
                 for act in summary['activities']:
-                    f.write(f"  - {act['name']} ({act['type']}): {act['duration']}, Avg HR: {act['avg_hr']}\n")
+                    # Format: Name (Type): Duration | HR: X | Y cal
+                    cal_str = f" | {act['calories']} cal" if act.get('calories') else ""
+                    hr_str = f" | HR: {act['avg_hr']}" if act.get('avg_hr') else ""
+                    f.write(f"  - {act['name']} ({act['type']}): {act['duration']}{hr_str}{cal_str}\n")
             else:
                 f.write("  (None)\n")
             
