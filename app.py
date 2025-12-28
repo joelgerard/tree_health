@@ -737,7 +737,8 @@ def api_data():
         "dates": [],
         "steps": [],
         "rhr": [],
-        "stress": []
+        "stress": [],
+        "batt": []
     }
     
     try:
@@ -782,6 +783,12 @@ def api_data():
             row_stress = cursor.fetchone()
             stress = row_stress['stress_avg'] if row_stress else None
             data["stress"].append(stress)
+            
+            # Body Battery (bb_max)
+            cursor.execute("SELECT bb_max FROM daily_summary WHERE day = ?", (date_str,))
+            row_bb = cursor.fetchone()
+            batt = row_bb['bb_max'] if row_bb else None
+            data["batt"].append(batt)
             
             current += timedelta(days=1)
             

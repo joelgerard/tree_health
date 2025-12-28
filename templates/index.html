@@ -604,6 +604,17 @@
                         visible: true
                     };
 
+                    const traceBatt = {
+                        x: data.dates,
+                        y: data.batt,
+                        name: 'Body Battery (Max)',
+                        yaxis: 'y2',
+                        type: 'scatter',
+                        mode: 'lines',
+                        line: { color: '#3498db', width: 2 },
+                        visible: true
+                    };
+
                     const layout = {
                         title: { text: '', font: { color: '#2c3e50' } },
                         paper_bgcolor: 'rgba(0,0,0,0)',
@@ -623,7 +634,7 @@
                             zeroline: false
                         },
                         yaxis2: {
-                            title: 'RHR / Stress',
+                            title: 'Biometrics',
                             overlaying: 'y',
                             side: 'right',
                             color: '#2c3e50',
@@ -664,7 +675,7 @@
                         hoverlabel: { bgcolor: "#fff", bordercolor: "#eee", font: { color: "#333" } }
                     };
 
-                    Plotly.newPlot('trendChart', [traceSteps, traceRHR, traceStress], layout, { responsive: true, displayModeBar: false });
+                    Plotly.newPlot('trendChart', [traceSteps, traceRHR, traceStress, traceBatt], layout, { responsive: true, displayModeBar: false });
                 });
 
             // Fetch Recovery History

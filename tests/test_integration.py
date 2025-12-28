@@ -98,6 +98,7 @@ class TestTreeHealthIntegration(unittest.TestCase):
         self.assertIn('steps', data)
         self.assertIn('rhr', data)
         self.assertIn('stress', data)
+        self.assertIn('batt', data)
 
 if __name__ == '__main__':
     unittest.main()
