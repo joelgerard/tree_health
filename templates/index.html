@@ -555,134 +555,205 @@
 
         <!-- Trend Analysis -->
         <h5 class="text-secondary mb-3 ps-2">14-Day Trend Analysis</h5>
-        <div class="glass-panel p-4">
-            <div id="trendChart" style="width:100%; height:400px;"></div>
+        <div class="glass-panel p-4 mb-4">
+            <h5 class="text-secondary text-uppercase letter-spacing-2 mb-4">Activity & Capacity (14-Day)</h5>
+            <div id="trendChart" style="height: 350px;"></div>
         </div>
-<!-- Recovery Score History -->
-<h5 class="text-secondary mb-3 ps-2 mt-5">Recovery Score History</h5>
-<div class="glass-panel p-4 mb-5">
-    <div id="recoveryChart" style="width:100%; height:400px;"></div>
+<!-- Biometrics Chart -->
+<div class="glass-panel p-4 mb-4">
+    <h5 class="text-secondary text-uppercase letter-spacing-2 mb-4">Metabolic Health (14-Day)</h5>
+    <div id="biometricsChart" style="height: 350px;"></div>
 </div>
-    </div>
 
-    <!-- Chart Script -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            fetch('/api/data')
-                .then(response => response.json())
-                .then(data => {
-                    const traceSteps = {
-                        x: data.dates,
-                        y: data.steps,
-                        name: 'Steps',
-                        type: 'bar',
-                        marker: {
-                            color: 'rgba(46, 204, 113, 0.4)',
-                            line: { color: 'rgba(46, 204, 113, 0.8)', width: 1.5 }
-                        }
-                    };
-
-                    const traceRHR = {
-                        x: data.dates,
-                        y: data.rhr,
-                        name: 'RHR',
-                        yaxis: 'y2',
-                        type: 'scatter',
-                        mode: 'lines+markers',
-                        line: { color: '#e74c3c', width: 3, shape: 'spline' },
-                        marker: { size: 8, color: '#e74c3c', line: { color: '#fff', width: 2 } }
-                    };
-
-                    const traceStress = {
-                        x: data.dates,
-                        y: data.stress,
-                        name: 'Stress',
-                        yaxis: 'y2',
-                        type: 'scatter',
-                        mode: 'lines',
-                        line: { color: '#9b59b6', width: 2, dash: 'dot' },
-                        visible: true
-                    };
-
-                    const traceBatt = {
-                        x: data.dates,
-                        y: data.batt,
-                        name: 'Body Battery (Max)',
-                        yaxis: 'y2',
-                        type: 'scatter',
-                        mode: 'lines',
-                        line: { color: '#3498db', width: 2 },
-                        visible: true
-                    };
-
-                    const layout = {
-                        title: { text: '', font: { color: '#2c3e50' } },
-                        paper_bgcolor: 'rgba(0,0,0,0)',
-                        plot_bgcolor: 'rgba(0,0,0,0)',
-                        showlegend: true,
-                        legend: { x: 0, y: 1.15, orientation: 'h', font: { color: '#7f8c8d' } },
-                        xaxis: {
-                            color: '#7f8c8d',
-                            showgrid: false,
-                            tickfont: { size: 11 }
-                        },
-                        yaxis: {
-                            title: 'Steps',
-                            color: '#7f8c8d',
-                            showgrid: true,
-                            gridcolor: 'rgba(0, 0, 0, 0.05)',
-                            zeroline: false
-                        },
-                        yaxis2: {
-                            title: 'Biometrics',
-                            overlaying: 'y',
-                            side: 'right',
-                            color: '#2c3e50',
-                            showgrid: false,
-                            zeroline: false
-                        },
-                        shapes: [
-                            {
-                                type: 'line',
-                                xref: 'paper',
-                                x0: 0,
-                                x1: 1,
-                                yref: 'y',
-                                y0: 4500,
-                                y1: 4500,
-                                line: {
-                                    color: 'rgba(231, 76, 60, 0.5)',
-                                    width: 2,
-                                    dash: 'dot'
-                                },
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                // Fetch Trend Data
+                fetch('/api/data')
+                    .then(response => response.json())
+                    .then(data => {
+                        // CHART 1: Activity & Capacity
+                        const traceSteps = {
+                            x: data.dates,
+                            y: data.steps,
+                            name: 'Steps',
+                            type: 'bar',
+                            marker: {
+                                color: 'rgba(46, 204, 113, 0.4)',
+                                line: { color: 'rgba(46, 204, 113, 0.8)', width: 1.5 }
                             }
-                        ],
-                        annotations: [
-                            {
-                                xref: 'paper',
-                                x: 0.98,
-                                xanchor: 'right',
-                                y: 4500,
-                                yref: 'y',
-                                text: 'Safety Limit',
-                                showarrow: false,
-                                font: { color: '#e74c3c', size: 10, weight: 'bold' },
-                                yanchor: 'bottom'
+                        };
+
+                        const traceBatt = {
+                            x: data.dates,
+                            y: data.batt,
+                            name: 'Body Battery (Max)',
+                            yaxis: 'y2',
+                            type: 'scatter',
+                            mode: 'lines',
+                            line: { color: '#3498db', width: 2 },
+                            visible: true
+                        };
+
+                        const traceRHR = {
+                            x: data.dates,
+                            y: data.rhr,
+                            name: 'RHR',
+                            yaxis: 'y2',
+                            type: 'scatter',
+                            mode: 'lines',
+                            line: { color: '#e74c3c', width: 2 }
+                        };
+
+                        const traceStress = {
+                            x: data.dates,
+                            y: data.stress,
+                            name: 'Stress',
+                            yaxis: 'y2',
+                            type: 'scatter',
+                            mode: 'lines',
+                            line: { color: '#9b59b6', width: 2, dash: 'dot' }
+                        };
+
+                        const layout1 = {
+                            title: { text: '', font: { color: '#2c3e50' } },
+                            paper_bgcolor: 'rgba(0,0,0,0)',
+                            plot_bgcolor: 'rgba(0,0,0,0)',
+                            showlegend: true,
+                            legend: { x: 0, y: 1.15, orientation: 'h', font: { color: '#7f8c8d' } },
+                            margin: { l: 50, r: 50, t: 40, b: 40 },
+                            xaxis: { color: '#7f8c8d', showgrid: false },
+                            yaxis: { title: 'Steps', color: '#7f8c8d', showgrid: true, gridcolor: 'rgba(0,0,0,0.05)' },
+                            yaxis2: {
+                                title: 'Biometrics',
+                                overlaying: 'y',
+                                side: 'right',
+                                color: '#2c3e50',
+                                showgrid: false
                             }
-                        ],
-                        margin: { l: 50, r: 50, t: 40, b: 40 },
-                        hovermode: 'x unified',
-                        hoverlabel: { bgcolor: "#fff", bordercolor: "#eee", font: { color: "#333" } }
-                    };
+                        };
 
-                    Plotly.newPlot('trendChart', [traceSteps, traceRHR, traceStress, traceBatt], layout, { responsive: true, displayModeBar: false });
-                });
+                        Plotly.newPlot('trendChart', [traceSteps, traceBatt, traceRHR, traceStress], layout1, { responsive: true, displayModeBar: false });
 
-            // Fetch Recovery History
-            fetch('/api/recovery_history?days=365')
-                .then(response => response.json())
-                .then(data => {
-                    const traceRecovery = {
+                        // CHART 2: Metabolic Health
+                        const traceCost = {
+                            x: data.dates,
+                            y: data.cost,
+                            name: 'Metabolic Cost',
+                            type: 'scatter',
+                            mode: 'lines+markers',
+                            line: { color: '#f1c40f', width: 2, dash: 'dot' },
+                            hovertemplate: '%{y} cals/1k<extra></extra>'
+                        };
+
+                        // Use copies for second chart to avoid interference if Plotly mutates them
+                        const traceRHR2 = { ...traceRHR };
+                        const traceStress2 = { ...traceStress };
+
+                        const layout2 = {
+                            title: { text: '', font: { color: '#2c3e50' } },
+                            paper_bgcolor: 'rgba(0,0,0,0)',
+                            plot_bgcolor: 'rgba(0,0,0,0)',
+                            showlegend: true,
+                            legend: { x: 0, y: 1.15, orientation: 'h', font: { color: '#7f8c8d' } },
+                            margin: { l: 50, r: 50, t: 40, b: 40 },
+                            xaxis: { color: '#7f8c8d', showgrid: false },
+                            yaxis: {
+                                title: 'Physio Cost',
+                                color: '#f1c40f',
+                                showgrid: true,
+                                gridcolor: 'rgba(0,0,0,0.05)'
+                            },
+                            yaxis2: {
+                                title: 'RHR / Stress',
+                                overlaying: 'y',
+                                side: 'right',
+                                color: '#2c3e50',
+                                showgrid: false
+                            }
+                        };
+
+                        Plotly.newPlot('biometricsChart', [traceCost, traceRHR2, traceStress2], layout2, { responsive: true, displayModeBar: false });
+                    });
+
+                // Fetch Recovery History
+                fetch('/api/recovery_history?days=365')
+                    .then(response => response.json())
+                    .then(data => {
+                        const traceRecovery = {
+                            x: data.dates,
+                            y: data.recovery_score,
+                            name: 'Recovery Score',
+                            type: 'scatter',
+                            mode: 'lines+markers',
+                            line: { color: '#2c3e50', width: 4 },
+                            marker: { size: 10, color: '#2c3e50', line: { color: '#fff', width: 2 } }
+                        };
+
+                        const traceRHRScore = {
+                            x: data.dates,
+                            y: data.rhr_score,
+                            name: 'RHR Score',
+                            type: 'scatter',
+                            mode: 'lines',
+                            line: { color: '#e74c3c', width: 2, dash: 'dot' },
+                            visible: true
+                        };
+
+                        const traceHRVScore = {
+                            x: data.dates,
+                            y: data.hrv_score,
+                            name: 'HRV Score',
+                            type: 'scatter',
+                            mode: 'lines',
+                            line: { color: '#f1c40f', width: 2, dash: 'dot' },
+                            visible: true
+                        };
+
+                        const traceStressScore = {
+                            x: data.dates,
+                            y: data.stress_score,
+                            name: 'Stress Score',
+                            type: 'scatter',
+                            mode: 'lines',
+                            line: { color: '#9b59b6', width: 2, dash: 'dot' },
+                            visible: true
+                        };
+
+                        const layoutRec = {
+                            title: { text: '', font: { color: '#2c3e50' } },
+                            paper_bgcolor: 'rgba(0,0,0,0)',
+                            plot_bgcolor: 'rgba(0,0,0,0)',
+                            showlegend: true,
+                            legend: { x: 0, y: 1.15, orientation: 'h', font: { color: '#7f8c8d' } },
+                            xaxis: {
+                                color: '#7f8c8d',
+                                showgrid: false,
+                                tickfont: { size: 11 }
+                            },
+                            yaxis: {
+                                title: 'Score (%)',
+                                color: '#7f8c8d',
+                                showgrid: true,
+                                gridcolor: 'rgba(0, 0, 0, 0.05)',
+                                zeroline: false,
+                                range: [0, 105]
+                            },
+                            margin: { l: 50, r: 50, t: 40, b: 40 },
+                            hovermode: 'x unified',
+                            hoverlabel: { bgcolor: "#fff", bordercolor: "#eee", font: { color: "#333" } }
+                        };
+
+                        Plotly.newPlot('recoveryChart', [traceRecovery, traceRHRScore, traceHRVScore, traceStressScore], layoutRec, { responsive: true, displayModeBar: false });
+                    });
+            });
+            </script>
+            <!-- Recovery Score History -->
+            <h5 class="text-secondary mb-3 ps-2 mt-5">Recovery Score History</h5>
+            <div class="glass-panel p-4 mb-5">
+                <div id="recoveryChart" style="width:100%; height:400px;"></div>
+            </div>
+            </div>
+
                         x: data.dates,
                         y: data.recovery_score,
                         name: 'Recovery Score',

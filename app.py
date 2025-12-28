@@ -738,7 +738,8 @@ def api_data():
         "steps": [],
         "rhr": [],
         "stress": [],
-        "batt": []
+        "batt": [],
+        "cost": []
     }
     
     try:
@@ -789,6 +790,17 @@ def api_data():
             row_bb = cursor.fetchone()
             batt = row_bb['bb_max'] if row_bb else None
             data["batt"].append(batt)
+
+            # Physiological Cost
+            # Need active calories
+            cursor.execute("SELECT calories_active FROM daily_summary WHERE day = ?", (date_str,))
+            row_cals = cursor.fetchone()
+            active_cals = row_cals['calories_active'] if row_cals else 0
+            
+            cost = 0
+            if steps and steps > 0 and active_cals:
+                cost = round((active_cals / steps) * 1000, 1)
+            data["cost"].append(cost)
             
             current += timedelta(days=1)
             
