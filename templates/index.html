@@ -12,7 +12,7 @@
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <!-- Plotly -->
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" charset="utf-8"></script>
 
     <style>
         :root {
@@ -593,6 +593,17 @@
                         marker: { size: 8, color: '#e74c3c', line: { color: '#fff', width: 2 } }
                     };
 
+                    const traceStress = {
+                        x: data.dates,
+                        y: data.stress,
+                        name: 'Stress',
+                        yaxis: 'y2',
+                        type: 'scatter',
+                        mode: 'lines',
+                        line: { color: '#9b59b6', width: 2, dash: 'dot' },
+                        visible: true
+                    };
+
                     const layout = {
                         title: { text: '', font: { color: '#2c3e50' } },
                         paper_bgcolor: 'rgba(0,0,0,0)',
@@ -612,10 +623,10 @@
                             zeroline: false
                         },
                         yaxis2: {
-                            title: 'RHR (bpm)',
+                            title: 'RHR / Stress',
                             overlaying: 'y',
                             side: 'right',
-                            color: '#e74c3c',
+                            color: '#2c3e50',
                             showgrid: false,
                             zeroline: false
                         },
@@ -653,7 +664,7 @@
                         hoverlabel: { bgcolor: "#fff", bordercolor: "#eee", font: { color: "#333" } }
                     };
 
-                    Plotly.newPlot('trendChart', [traceSteps, traceRHR], layout, { responsive: true, displayModeBar: false });
+                    Plotly.newPlot('trendChart', [traceSteps, traceRHR, traceStress], layout, { responsive: true, displayModeBar: false });
                 });
 
             // Fetch Recovery History

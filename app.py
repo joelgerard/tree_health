@@ -736,16 +736,16 @@ def api_data():
     data = {
         "dates": [],
         "steps": [],
-        "rhr": []
+        "rhr": [],
+        "stress": []
     }
     
     try:
         conn = get_db_connection(GARMIN_DB)
         cursor = conn.cursor()
         
-        # We need Steps (daily_summary) and RHR (resting_hr or daily_summary?)
-        # Requirements says: RHR from resting_hr table? Or daily_summary?
-        # daily_summary has 'rhr' column too. 
+        # We need Steps, RHR, Stress from daily_summary
+        # daily_summary has 'days', 'steps', 'rhr', 'stress_avg' 
         # Metric 3 used `resting_hr` table. Let's stick to `resting_hr` table for consistency if possible, 
         # but `daily_summary` might be easier to join if we want everything in one go.
         # Let's query them separately to be safe or join them.
@@ -775,7 +775,13 @@ def api_data():
                 if row_ds_rhr:
                     rhr = row_ds_rhr['rhr']
             
-            data["rhr"].append(rhr) # None will be a gap in line chart, which is good.
+            data["rhr"].append(rhr) 
+            
+            # Stress
+            cursor.execute("SELECT stress_avg FROM daily_summary WHERE day = ?", (date_str,))
+            row_stress = cursor.fetchone()
+            stress = row_stress['stress_avg'] if row_stress else None
+            data["stress"].append(stress)
             
             current += timedelta(days=1)
             
