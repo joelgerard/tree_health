@@ -638,13 +638,25 @@
                         const traceCost = {
                             x: data.dates,
                             y: data.cost,
-                            name: 'Metabolic Cost',
+                            name: 'Physio Cost',
                             type: 'scatter',
                             mode: 'lines+markers',
                             line: { color: '#f1c40f', width: 2, dash: 'dot' },
                             hovertemplate: '%{y} cals/1k<extra></extra>'
                         };
 
+                        const traceActiveCals = {
+                            x: data.dates,
+                            y: data.active_cals,
+                            name: 'Active Calories',
+                            type: 'bar',
+                            marker: {
+                                color: 'rgba(243, 156, 18, 0.3)',
+                                line: { color: 'rgba(243, 156, 18, 0.8)', width: 1.5 }
+                            },
+                            hovertemplate: '%{y} kcal<extra></extra>'
+                        };
+                        
                         // Use copies for second chart to avoid interference if Plotly mutates them
                         const traceRHR2 = { ...traceRHR };
                         const traceStress2 = { ...traceStress };
@@ -657,11 +669,11 @@
                             legend: { x: 0, y: 1.15, orientation: 'h', font: { color: '#7f8c8d' } },
                             margin: { l: 50, r: 50, t: 40, b: 40 },
                             xaxis: { color: '#7f8c8d', showgrid: false },
-                            yaxis: {
-                                title: 'Physio Cost',
+                            yaxis: { 
+                                title: 'Cost / Calories', 
                                 color: '#f1c40f',
                                 showgrid: true,
-                                gridcolor: 'rgba(0,0,0,0.05)'
+                                gridcolor: 'rgba(0,0,0,0.05)' 
                             },
                             yaxis2: {
                                 title: 'RHR / Stress',
@@ -672,7 +684,7 @@
                             }
                         };
 
-                        Plotly.newPlot('biometricsChart', [traceCost, traceRHR2, traceStress2], layout2, { responsive: true, displayModeBar: false });
+                        Plotly.newPlot('biometricsChart', [traceActiveCals, traceCost, traceRHR2, traceStress2], layout2, { responsive: true, displayModeBar: false });
                     });
 
                 // Fetch Recovery History

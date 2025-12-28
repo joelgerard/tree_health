@@ -739,7 +739,8 @@ def api_data():
         "rhr": [],
         "stress": [],
         "batt": [],
-        "cost": []
+        "cost": [],
+        "active_cals": []
     }
     
     try:
@@ -801,6 +802,7 @@ def api_data():
             if steps and steps > 0 and active_cals:
                 cost = round((active_cals / steps) * 1000, 1)
             data["cost"].append(cost)
+            data["active_cals"].append(active_cals)
             
             current += timedelta(days=1)
             
