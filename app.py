@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 # Configuration
 # Configuration
-DEFAULT_DB_DIR = os.path.expanduser("/Users/joelgerard/Library/CloudStorage/GoogleDrive-joelgerard@gmail.com/My Drive/joel health/tree health/DBs")
+DEFAULT_DB_DIR = os.path.expanduser("/Users/joelgerard/Library/CloudStorage/GoogleDrive-joelgerard@gmail.com/My Drive/joel health/tree health/tree_home/HealthData/DBs")
 LOCAL_CONFIG_PATH = os.path.expanduser("~/.tree_health_config")
 
 if os.environ.get("TREE_HEALTH_DB_DIR"):
