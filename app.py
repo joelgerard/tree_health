@@ -371,6 +371,116 @@ def get_recovery_score(conn, daily_status, target_date=None):
         }
     }
 
+def get_trend_data(conn, days=7):
+    """
+    Fetch trend data for the Trend Command Center.
+    Calculates 7-day vs 3-day slopes and efficiency costs.
+    """
+    cursor = conn.cursor()
+    # Fetch last N days
+    # Need RHR, Body Battery (bb_max), Steps, Calories
+    # daily_summary has 'bb_max' or 'bb_charged'? 
+    # Logic in generate_health_brief used bb_max.
+    # Logic in app.py uses bb_charged usually.
+    # calculate_metrics uses bb_charged. 
+    # Brief generic table schemas: daily_summary has bb_max, bb_charged.
+    # Let's use bb_max for "Body Battery" Trend generally, as bb_charged is just recharge amount.
+    # actually user example "Battery: 7d ... (-29%)". Usually implies Level? Or Max?
+    # If "Crashing Trend" in brief was bb_max, let's stick to bb_max for consistency.
+    
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=days-1)
+    
+    cursor.execute(f"""
+        SELECT day, rhr, bb_max, steps, calories_active, stress_avg 
+        FROM daily_summary 
+        WHERE day BETWEEN ? AND ?
+        ORDER BY day DESC
+    """, (start_date.isoformat(), end_date.isoformat()))
+    
+    rows = cursor.fetchall()
+    
+    # We need at least 7 days for 7d trend, or whatever available
+    # rows are DESC: Today=0, Yesterday=1...
+    
+    trends = {
+        "rhr": {"trend_7d": 0, "trend_3d": 0, "val": 0},
+        "batt": {"trend_7d": 0, "trend_3d": 0, "val": 0},
+        "stress": {"trend_7d": 0, "trend_3d": 0, "val": 0},
+        "recent_costs": []
+    }
+    
+    if not rows:
+        return trends
+        
+    # Helper for safe access
+    def get_val(r, key):
+        return r[key] if r and r[key] is not None else 0
+
+    # 1. 7-Day Trend (Diff of Avgs)
+    # Recent 3 (0,1,2) vs Oldest 3 (assuming 7 days data: 4,5,6)
+    # If less than 7 days, adjust window?
+    # User asked for "Avg of last 3 days - Avg of first 3 days of the week"
+    
+    recent_rows = rows[:3]
+    old_rows = rows[-3:] if len(rows) >= 6 else []
+    
+    if len(rows) >= 6:
+        # RHR 7d
+        rhr_recent = sum([get_val(r, 'rhr') for r in recent_rows]) / 3
+        rhr_old = sum([get_val(r, 'rhr') for r in old_rows]) / 3
+        trends['rhr']['trend_7d'] = round(rhr_recent - rhr_old, 1)
+        
+        # Batt 7d (bb_max)
+        batt_recent = sum([get_val(r, 'bb_max') for r in recent_rows]) / 3
+        batt_old = sum([get_val(r, 'bb_max') for r in old_rows]) / 3
+        trends['batt']['trend_7d'] = round(batt_recent - batt_old, 1)
+
+        # Stress 7d
+        stress_recent = sum([get_val(r, 'stress_avg') for r in recent_rows]) / 3
+        stress_old = sum([get_val(r, 'stress_avg') for r in old_rows]) / 3
+        trends['stress']['trend_7d'] = round(stress_recent - stress_old, 1)
+        
+    # 2. 3-Day Trend (Today - 3 Days Ago)
+    # Today index 0. 3 Days Ago index 3.
+    if len(rows) > 3:
+        today_row = rows[0]
+        ago3_row = rows[3]
+        
+        trends['rhr']['trend_3d'] = get_val(today_row, 'rhr') - get_val(ago3_row, 'rhr')
+        trends['batt']['trend_3d'] = get_val(today_row, 'bb_max') - get_val(ago3_row, 'bb_max')
+        trends['stress']['trend_3d'] = get_val(today_row, 'stress_avg') - get_val(ago3_row, 'stress_avg')
+        
+    trends['rhr']['val'] = get_val(rows[0], 'rhr')
+    trends['batt']['val'] = get_val(rows[0], 'bb_max')
+    trends['stress']['val'] = get_val(rows[0], 'stress_avg')
+
+    # 3. Efficiency Costs (Last 3 Days)
+    # Indices 0, 1, 2
+    for i in range(min(3, len(rows))):
+        r = rows[i]
+        cals = get_val(r, 'calories_active')
+        steps = get_val(r, 'steps')
+        cost = (cals / steps * 1000) if steps > 0 else 0
+        
+        # Date label
+        d_obj = datetime.strptime(r['day'], '%Y-%m-%d').date()
+        today = datetime.now().date()
+        if d_obj == today:
+            lbl = "Today"
+        elif d_obj == today - timedelta(days=1):
+            lbl = "Yesterday"
+        else:
+            lbl = d_obj.strftime("%a")
+            
+        trends['recent_costs'].append({
+            "label": lbl,
+            "cost": int(cost),
+            "status": "GREEN" if cost < 30 else ("RED" if cost > 50 else "YELLOW")
+        })
+        
+    return trends
+
 def calculate_metrics(target_date, conn, conn_activities):
     """
     The Core Logic Engine (FINAL VERSION).
@@ -490,6 +600,7 @@ def index():
         conn_activities = get_db_connection(GARMIN_ACTIVITIES_DB)
         today_str = datetime.now().strftime('%Y-%m-%d')
         metrics_raw = calculate_metrics(today_str, conn, conn_activities)
+        trends = get_trend_data(conn)
         conn.close()
         conn_activities.close()
     except Exception as e:
@@ -570,7 +681,7 @@ def index():
     except Exception as e:
         print(f"Error calculating recovery score: {e}")
         
-    return render_template('index.html', fresh=is_fresh, last_data=last_data, last_hrv=last_hrv, last_sleep=last_sleep, metrics=metrics, recovery=recovery_score)
+    return render_template('index.html', fresh=is_fresh, last_data=last_data, last_hrv=last_hrv, last_sleep=last_sleep, metrics=metrics, recovery=recovery_score, trends=trends)
 
 @app.route('/sync', methods=['POST'])
 def sync():
