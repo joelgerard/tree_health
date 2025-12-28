@@ -129,68 +129,93 @@ def generate_report(db_dir, days=7):
     # --- Current Snapshot (Today) ---
     today = df.iloc[0]
     
-    # Determine Status Flags
-    flags = {
-        'CRITICAL_BATTERY': (today['bb_max'] < 30) if pd.notnull(today['bb_max']) else False,
-        'METABOLIC_FREEZE': (today['rhr'] < 48) if pd.notnull(today['rhr']) else False,
-        'LAG_2_RISK': (today['lag_2_steps'] > 5000) if pd.notnull(today['lag_2_steps']) else False,
-        'HIGH_COST_DAY': (today['physio_cost'] > 35) if pd.notnull(today['physio_cost']) else False,
-    }
+    # --- Logic & Status Determination ---
     
-    # Status Light
-    # Red if Critical Battery or Metabolic Freeze
-    # Yellow if Lag 2 or High Cost
+    # 1. Calc Trends Numeric
+    # Compare Today (idx 0) vs Start of Period (idx days-1)
+    trend_window_days = days if days > 1 else 1 
+    compare_idx = days - 1 if days > 1 else 1
+    if compare_idx >= len(df):
+        compare_idx = len(df) - 1
+    has_trend_data = (len(df) > compare_idx) and (compare_idx > 0)
+    prev_period = df.iloc[compare_idx] if has_trend_data else None
+    
+    # Numeric Deltas for Logic
+    bb_delta = (today['bb_max'] - prev_period['bb_max']) if (has_trend_data and pd.notnull(prev_period['bb_max']) and pd.notnull(today['bb_max'])) else 0
+    
+    # 2. Define Flags
+    # RED (CRITICAL STOP)
+    is_critical_battery = (today['bb_max'] < 30) if pd.notnull(today['bb_max']) else False
+    is_metabolic_freeze = (today['rhr'] < 48) if pd.notnull(today['rhr']) else False
+    is_lag_2_risk = (today['lag_2_steps'] > 5000) if pd.notnull(today['lag_2_steps']) else False
+    
+    # YELLOW (CAUTION)
+    # Body Battery between 30 and 50
+    is_low_battery = (today['bb_max'] >= 30 and today['bb_max'] <= 50) if pd.notnull(today['bb_max']) else False
+    # Crashing Trend: Drop > 10%
+    is_crashing_trend = (bb_delta <= -10)
+    # High Cost
+    is_high_cost = (today['physio_cost'] > 35) if pd.notnull(today['physio_cost']) else False
+    # Low HRV
+    is_low_hrv = (today['hrv_avg'] < 45) if pd.notnull(today['hrv_avg']) else False
+    
+    # 3. Determine Verdict
     status_light = "GREEN"
-    primary_driver = "None"
+    primary_driver = "Stable Trend"
     
-    if flags['CRITICAL_BATTERY']:
+    # Check RED first
+    if is_critical_battery:
         status_light = "RED"
         primary_driver = f"Critical Battery ({int(today['bb_max'])}%)"
-    elif flags['METABOLIC_FREEZE']:
+    elif is_metabolic_freeze:
         status_light = "RED"
         primary_driver = f"Metabolic Freeze ({int(today['rhr'])} bpm)"
-    elif flags['LAG_2_RISK']:
-        status_light = "YELLOW"
+    elif is_lag_2_risk:
+        status_light = "RED"
         primary_driver = f"Lag-2 Overload ({int(today['lag_2_steps'])} steps)"
-    elif flags['HIGH_COST_DAY']:
+        
+    # Check YELLOW if not RED
+    elif is_low_battery:
         status_light = "YELLOW"
-        primary_driver = f"High Cost Day ({today['physio_cost']:.1f})"
+        primary_driver = f"Functional Insolvency ({int(today['bb_max'])}%)"
+    elif is_crashing_trend:
+        status_light = "YELLOW"
+        primary_driver = f"Crashing Trend ({int(bb_delta)}% drop)"
+    elif is_high_cost:
+        status_light = "YELLOW"
+        primary_driver = f"Inefficient Day (Cost {today['physio_cost']:.1f})"
+    elif is_low_hrv:
+        status_light = "YELLOW"
+        primary_driver = f"Nervous System Stuck (HRV {int(today['hrv_avg'])})"
         
     # Formatting Helpers
     def fmt_trend(curr, prev, label_up="UP", label_down="DOWN", label_flat="FLAT", positive_is_good=True, is_rhr=False):
-        if pd.isnull(curr) or pd.isnull(prev):
-            return "N/A"
-        diff = curr - prev
-        if diff == 0:
-            return f"{label_flat} ({int(curr)})" if is_rhr else f"{label_flat} ({int(prev)} -> {int(curr)})"
-            
-        trend_label = label_up if diff > 0 else label_down
-        
-        # Special naming for specific metrics based on request example
-        # RHR: STABLE (-1 bpm)
-        # HRV: FLAT (43 -> 43)
-        # BATTERY: CRASHING (-22% from yesterday)
-        # SLEEP: REBOUND (+2h duration)
-        
-        # We'll use custom logic per metric below instead of generic function
-        return ""
+        return "" # Using custom blocks
 
+    # --- Output ---
+    days_label = f"{days} Days" if days > 1 else "48h"
+    print(f"=== CURRENT STATUS ({today['day']}) ===")
+    print(f"STATUS_LIGHT: [{status_light}]")
+    print(f"PRIMARY_DRIVER: [{primary_driver}]")
+    print("")
+    print(f"=== TREND ANALYSIS (Last {days_label}) ===")
+    
     # RHR Trend
     rhr_trend_str = "N/A"
-    if pd.notnull(today['delta_rhr']):
-        diff = today['delta_rhr']
+    if has_trend_data and pd.notnull(today['rhr']) and pd.notnull(prev_period['rhr']):
+        diff = today['rhr'] - prev_period['rhr']
         if abs(diff) < 2:
             rhr_trend_str = f"STABLE ({int(diff):+d} bpm)"
         elif diff > 0:
             rhr_trend_str = f"RISING ({int(diff):+d} bpm)"
         else:
             rhr_trend_str = f"DROPPING ({int(diff):+d} bpm)"
-            
+
     # HRV Trend
     hrv_trend_str = "N/A"
-    if pd.notnull(today['prev_hrv']) and pd.notnull(today['hrv_avg']):
-        diff = today['hrv_avg'] - today['prev_hrv']
-        p = int(today['prev_hrv'])
+    if has_trend_data and pd.notnull(today['hrv_avg']) and pd.notnull(prev_period['hrv_avg']):
+        diff = today['hrv_avg'] - prev_period['hrv_avg']
+        p = int(prev_period['hrv_avg'])
         c = int(today['hrv_avg'])
         if abs(diff) < 2:
             hrv_trend_str = f"FLAT ({p} -> {c})"
@@ -199,50 +224,43 @@ def generate_report(db_dir, days=7):
         else:
             hrv_trend_str = f"DROPPING ({p} -> {c})"
             
-    # Battery Trend
+    # Battery Trend (Using computed bb_delta)
     batt_trend_str = "N/A"
-    if pd.notnull(today['delta_bb']):
-        diff = today['delta_bb']
-        if diff <= -20:
-            batt_trend_str = f"CRASHING ({int(diff)}% from yesterday)"
-        elif diff < -5:
-            batt_trend_str = f"DRAINING ({int(diff)}% from yesterday)"
-        elif diff > 5:
-            batt_trend_str = f"CHARGING ({int(diff):+d}% from yesterday)"
+    if has_trend_data and pd.notnull(today['bb_max']) and pd.notnull(prev_period['bb_max']):
+        suffix = f"over {days_label}" if days > 1 else "from yesterday"
+        if bb_delta <= -20:
+            batt_trend_str = f"CRASHING ({int(bb_delta)}% {suffix})"
+        elif bb_delta < -5:
+            batt_trend_str = f"DRAINING ({int(bb_delta)}% {suffix})"
+        elif bb_delta > 5:
+            batt_trend_str = f"CHARGING ({int(bb_delta):+d}% {suffix})"
         else:
-            batt_trend_str = f"STABLE ({int(diff):+d}%)"
-            
+            batt_trend_str = f"STABLE ({int(bb_delta):+d}%)"
+
     # Sleep Trend
     sleep_trend_str = "N/A"
-    if pd.notnull(today['delta_sleep']):
-        diff = today['delta_sleep']
+    if has_trend_data and pd.notnull(today['sleep_hours']) and pd.notnull(prev_period['sleep_hours']):
+        diff = today['sleep_hours'] - prev_period['sleep_hours']
         if diff > 1.5:
             sleep_trend_str = f"REBOUND ({diff:+.1f}h duration)"
         elif diff < -1.5:
              sleep_trend_str = f"DEPRIVATION ({diff:+.1f}h duration)"
         else:
              sleep_trend_str = f"STEADY ({diff:+.1f}h)"
-
-    # --- Output ---
-    print(f"=== CURRENT STATUS ({today['day']}) ===")
-    print(f"STATUS_LIGHT: [{status_light}]")
-    print(f"PRIMARY_DRIVER: [{primary_driver}]")
-    print("")
-    print("=== TREND ANALYSIS (Last 48h) ===")
+             
     print(f"RHR_TREND:      {rhr_trend_str}")
     print(f"HRV_TREND:      {hrv_trend_str}")
     print(f"BATTERY_TREND:  {batt_trend_str}")
     print(f"SLEEP_TREND:    {sleep_trend_str}")
     print("")
     print("=== RISK FLAGS ===")
-    print(f"[{'X' if flags['CRITICAL_BATTERY'] else ' '}] Critical Battery (<30)")
-    print(f"[{'X' if flags['METABOLIC_FREEZE'] else ' '}] Metabolic Freeze (<48 bpm)")
-    print(f"[{'X' if flags['LAG_2_RISK'] else ' '}] Lag-2 Overload (>5k steps 48h ago)")
-    # Adding HIGH_COST_DAY if needed, explicitly requested in logic flags 
-    # but not in example output "Risk Flags" section strictly (example had 3).
-    # But User Requirements #3 said "HIGH_COST_DAY" is a Logic Flag.
-    # The example output showed 3 flags. I should probably add the 4th if defined in logic.
-    print(f"[{'X' if flags['HIGH_COST_DAY'] else ' '}] High Cost Day (>35 cost)")
+    print(f"[{'X' if is_critical_battery else ' '}] Critical Battery (<30)")
+    print(f"[{'X' if is_metabolic_freeze else ' '}] Metabolic Freeze (<48 bpm)")
+    print(f"[{'X' if is_lag_2_risk else ' '}] Lag-2 Overload (>5k steps 48h ago)")
+    print(f"[{'X' if is_low_battery else ' '}] Functional Insolvency (30-50%)")
+    print(f"[{'X' if is_crashing_trend else ' '}] Crashing Trend (>10% drop)")
+    print(f"[{'X' if is_high_cost else ' '}] High Cost Day (>35 cost)")
+    print(f"[{'X' if is_low_hrv else ' '}] Nervous System Stuck (HRV < 45)")
     print("")
     print(f"=== DATA TABLE (Last {days} Days) ===")
     print("Day        | RHR | HRV | Batt | Sleep | Steps | Cost")
