@@ -101,6 +101,7 @@ class TestTreeHealthIntegration(unittest.TestCase):
         self.assertIn('batt', data)
         self.assertIn('cost', data)
         self.assertIn('active_cals', data)
+        self.assertIn('hrv', data)
 
 if __name__ == '__main__':
     unittest.main()

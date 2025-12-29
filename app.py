@@ -21,7 +21,8 @@ else:
 
 GARMIN_DB = os.path.join(DB_DIR, "garmin.db")
 GARMIN_ACTIVITIES_DB = os.path.join(DB_DIR, "garmin_activities.db")
-# Note: HRV data is now expected in garmin.db
+GARMIN_HRV_DB = os.path.join(DB_DIR, "garmin_hrv.db")
+# Note: HRV data is now expected in garmin.db (Legacy comment?)
 SYNC_SCRIPT = os.path.expanduser("/Users/joelgerard/tree_home/export_garmin.sh")
 
 # --- DYNAMIC CONFIGURATION ---
@@ -407,21 +408,39 @@ def get_trend_data(conn, days=7):
         "rhr": {"trend_7d": 0, "trend_3d": 0, "val": 0},
         "batt": {"trend_7d": 0, "trend_3d": 0, "val": 0},
         "stress": {"trend_7d": 0, "trend_3d": 0, "val": 0},
+        "hrv": {"trend_7d": 0, "trend_3d": 0, "val": 0},
         "recent_costs": []
     }
     
     if not rows:
         return trends
+
+    if not rows:
+        return trends
+
+    # Fetch HRV Data
+    try:
+        cursor.execute(f"""
+            SELECT day, last_night_avg 
+            FROM hrv 
+            WHERE day BETWEEN ? AND ?
+            ORDER BY day DESC
+        """, (start_date.isoformat(), end_date.isoformat()))
+        rows_hrv = cursor.fetchall()
+        
+        # Map HRV by day for easy lookup
+        hrv_map = {row['day']: row['last_night_avg'] for row in rows_hrv if row['last_night_avg']}
+    except Exception as e:
+        print(f"Error fetching HRV trend data: {e}")
+        hrv_map = {}
         
     # Helper for safe access
     def get_val(r, key):
+        if key == 'hrv':
+            return hrv_map.get(r['day'], 0)
         return r[key] if r and r[key] is not None else 0
 
     # 1. 7-Day Trend (Diff of Avgs)
-    # Recent 3 (0,1,2) vs Oldest 3 (assuming 7 days data: 4,5,6)
-    # If less than 7 days, adjust window?
-    # User asked for "Avg of last 3 days - Avg of first 3 days of the week"
-    
     recent_rows = rows[:3]
     old_rows = rows[-3:] if len(rows) >= 6 else []
     
@@ -440,9 +459,13 @@ def get_trend_data(conn, days=7):
         stress_recent = sum([get_val(r, 'stress_avg') for r in recent_rows]) / 3
         stress_old = sum([get_val(r, 'stress_avg') for r in old_rows]) / 3
         trends['stress']['trend_7d'] = round(stress_recent - stress_old, 1)
+
+        # HRV 7d
+        hrv_recent = sum([get_val(r, 'hrv') for r in recent_rows]) / 3
+        hrv_old = sum([get_val(r, 'hrv') for r in old_rows]) / 3
+        trends['hrv']['trend_7d'] = round(hrv_recent - hrv_old, 1)
         
     # 2. 3-Day Trend (Today - 3 Days Ago)
-    # Today index 0. 3 Days Ago index 3.
     if len(rows) > 3:
         today_row = rows[0]
         ago3_row = rows[3]
@@ -450,10 +473,12 @@ def get_trend_data(conn, days=7):
         trends['rhr']['trend_3d'] = get_val(today_row, 'rhr') - get_val(ago3_row, 'rhr')
         trends['batt']['trend_3d'] = get_val(today_row, 'bb_max') - get_val(ago3_row, 'bb_max')
         trends['stress']['trend_3d'] = get_val(today_row, 'stress_avg') - get_val(ago3_row, 'stress_avg')
+        trends['hrv']['trend_3d'] = get_val(today_row, 'hrv') - get_val(ago3_row, 'hrv')
         
     trends['rhr']['val'] = get_val(rows[0], 'rhr')
     trends['batt']['val'] = get_val(rows[0], 'bb_max')
     trends['stress']['val'] = get_val(rows[0], 'stress_avg')
+    trends['hrv']['val'] = get_val(rows[0], 'hrv')
 
     # 3. Efficiency Costs (Last 3 Days)
     # Indices 0, 1, 2
@@ -740,7 +765,8 @@ def api_data():
         "stress": [],
         "batt": [],
         "cost": [],
-        "active_cals": []
+        "active_cals": [],
+        "hrv": []
     }
     
     try:
@@ -804,6 +830,12 @@ def api_data():
             data["cost"].append(cost)
             data["active_cals"].append(active_cals)
             
+            # HRV
+            cursor.execute("SELECT last_night_avg FROM hrv WHERE day = ?", (date_str,))
+            row_hrv = cursor.fetchone()
+            hrv = row_hrv['last_night_avg'] if row_hrv else None
+            data["hrv"].append(hrv)
+
             current += timedelta(days=1)
             
         conn.close()
