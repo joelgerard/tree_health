@@ -372,24 +372,14 @@ def get_recovery_score(conn, daily_status, target_date=None):
         }
     }
 
-def get_trend_data(conn, days=7):
+def get_trend_data(conn, target_date=None, days=7):
     """
     Fetch trend data for the Trend Command Center.
     Calculates 7-day vs 3-day slopes and efficiency costs.
     """
     cursor = conn.cursor()
-    # Fetch last N days
-    # Need RHR, Body Battery (bb_max), Steps, Calories
-    # daily_summary has 'bb_max' or 'bb_charged'? 
-    # Logic in generate_health_brief used bb_max.
-    # Logic in app.py uses bb_charged usually.
-    # calculate_metrics uses bb_charged. 
-    # Brief generic table schemas: daily_summary has bb_max, bb_charged.
-    # Let's use bb_max for "Body Battery" Trend generally, as bb_charged is just recharge amount.
-    # actually user example "Battery: 7d ... (-29%)". Usually implies Level? Or Max?
-    # If "Crashing Trend" in brief was bb_max, let's stick to bb_max for consistency.
     
-    end_date = datetime.now().date()
+    end_date = target_date if target_date else datetime.now().date()
     start_date = end_date - timedelta(days=days-1)
     
     cursor.execute(f"""
@@ -412,9 +402,6 @@ def get_trend_data(conn, days=7):
         "recent_costs": []
     }
     
-    if not rows:
-        return trends
-
     if not rows:
         return trends
 
@@ -490,13 +477,20 @@ def get_trend_data(conn, days=7):
         
         # Date label
         d_obj = datetime.strptime(r['day'], '%Y-%m-%d').date()
-        today = datetime.now().date()
-        if d_obj == today:
+        # Relative to target_date (which acts as "Today" in this context)
+        # But for UI consistency, we might want actual names or dates.
+        # Let's keep Today/Yesterday logic relative to ACTUAL today or TARGET today?
+        # User wants "look at dashboard on a specific day in the past".
+        # So "Today" should probably refer to the Selected Date to make sense in that context?
+        # Or should it just show the date?
+        # Let's stick to showing Date if not actual today/yesterday.
+        
+        if d_obj == datetime.now().date():
             lbl = "Today"
-        elif d_obj == today - timedelta(days=1):
+        elif d_obj == datetime.now().date() - timedelta(days=1):
             lbl = "Yesterday"
         else:
-            lbl = d_obj.strftime("%a")
+            lbl = d_obj.strftime("%a %d") # e.g. Mon 23
             
         trends['recent_costs'].append({
             "label": lbl,
@@ -619,18 +613,38 @@ def calculate_metrics(target_date, conn, conn_activities):
 def index():
     is_fresh, last_data, last_hrv, last_sleep, is_sleep_today = check_freshness()
     
+    # Parse date param for Historical View
+    date_str = request.args.get('date')
+    selected_date = None
+    if date_str:
+        try:
+            selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            # If viewing past, is_fresh is less relevant? Or maybe we can say "Data for [Date]"
+            # But let's keep is_fresh logic as "Is GLOBAL data fresh"
+        except ValueError:
+            selected_date = None
+
+    target_date_str = date_str if selected_date else datetime.now().strftime('%Y-%m-%d')
+    target_date_obj = selected_date if selected_date else datetime.now().date()
+    
     # 1. Run the Core Logic
     try:
         conn = get_db_connection(GARMIN_DB)
         conn_activities = get_db_connection(GARMIN_ACTIVITIES_DB)
-        today_str = datetime.now().strftime('%Y-%m-%d')
-        metrics_raw = calculate_metrics(today_str, conn, conn_activities)
-        trends = get_trend_data(conn)
+        metrics_raw = calculate_metrics(target_date_str, conn, conn_activities)
+        trends = get_trend_data(conn, target_date=target_date_obj)
         conn.close()
         conn_activities.close()
     except Exception as e:
         print(f"Error calculating metrics in index: {e}")
         metrics_raw = {"status": "GRAY", "reason": f"Error: {e}", "target_steps": 0, "metrics": {}}
+        trends = {
+            "rhr": {"trend_7d": 0, "trend_3d": 0, "val": 0},
+            "batt": {"trend_7d": 0, "trend_3d": 0, "val": 0},
+            "stress": {"trend_7d": 0, "trend_3d": 0, "val": 0},
+            "hrv": {"trend_7d": 0, "trend_3d": 0, "val": 0},
+            "recent_costs": []
+        }
 
     # 2. Map Core Logic to UI Panels (The "Adapter" Layer)
     
@@ -701,7 +715,7 @@ def index():
     recovery_score = None
     try:
         conn = get_db_connection(GARMIN_DB)
-        recovery_score = get_recovery_score(conn, daily_status)
+        recovery_score = get_recovery_score(conn, daily_status, target_date=target_date_obj)
         conn.close()
     except Exception as e:
         print(f"Error calculating recovery score: {e}")
@@ -714,7 +728,7 @@ def index():
         "INEFFICIENT_RECOVERY": (current_steps < 2500 and current_cost > 35)
     }
         
-    return render_template('index.html', fresh=is_fresh, last_data=last_data, last_hrv=last_hrv, last_sleep=last_sleep, metrics=metrics, recovery=recovery_score, trends=trends, flags=flags)
+    return render_template('index.html', fresh=is_fresh, last_data=last_data, last_hrv=last_hrv, last_sleep=last_sleep, metrics=metrics, recovery=recovery_score, trends=trends, flags=flags, selected_date=target_date_str)
 
 @app.route('/sync', methods=['POST'])
 def sync():
@@ -756,6 +770,7 @@ def sync():
         print(f"[{datetime.now()}] UNEXPECTED ERROR: {e}", flush=True)
         return jsonify({"status": "error", "message": f"An error occurred: {e}"}), 500
 
+
 @app.route('/api/data')
 def api_data():
     """
@@ -763,7 +778,17 @@ def api_data():
     """
     # 14 days including today? Or 14 days ending yesterday? 
     # Usually "14-Day Rolling View" includes the latest available data.
-    end_date = datetime.now().date()
+    
+    # Parse date param
+    date_str = request.args.get('date')
+    if date_str:
+        try:
+            end_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+             end_date = datetime.now().date()
+    else:
+        end_date = datetime.now().date()
+        
     start_date = end_date - timedelta(days=13)
     
     data = {

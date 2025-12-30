@@ -255,6 +255,13 @@
                 </div>
 
                 <div class="d-flex align-items-center gap-3">
+                    <!-- Date Picker -->
+                    <div class="glass-panel p-2 px-3">
+                        <input type="date" class="form-control form-control-sm bg-transparent border-0 text-dark fw-bold"
+                            value="{{ selected_date }}" onchange="window.location.href = '/?date=' + this.value"
+                            style="color-scheme: light;">
+                    </div>
+
                     {% if not fresh %}
                     <button class="btn btn-primary px-4 py-2 rounded-pill d-flex align-items-center gap-2"
                         hx-post="/sync" hx-swap="none" onclick="location.reload()"
@@ -291,7 +298,7 @@
                     {% endif %}
 
                     <div class="text-end glass-panel p-3 px-4" style="background: rgba(0,0,0,0.2);">
-                        <div class="text-secondary small text-uppercase">Today's Target</div>
+                        <div class="text-secondary small text-uppercase">Target</div>
                         <div class="h2 mb-0 fw-bold {{ 'text-' + metrics.final_verdict.status }}">{{
                             metrics.final_verdict.target }}</div>
                     </div>
@@ -607,7 +614,7 @@
         <script>
             document.addEventListener('DOMContentLoaded', function () {
                 // Fetch Trend Data
-                fetch('/api/data')
+                fetch('/api/data?date={{ selected_date }}')
                     .then(response => response.json())
                     .then(data => {
                         // CHART 1: Activity & Capacity
