@@ -797,6 +797,7 @@ def api_data():
         "rhr": [],
         "stress": [],
         "batt": [],
+        "batt_gain": [],
         "cost": [],
         "active_cals": [],
         "hrv": []
@@ -846,10 +847,12 @@ def api_data():
             data["stress"].append(stress)
             
             # Body Battery (bb_max)
-            cursor.execute("SELECT bb_max FROM daily_summary WHERE day = ?", (date_str,))
+            cursor.execute("SELECT bb_max, bb_charged FROM daily_summary WHERE day = ?", (date_str,))
             row_bb = cursor.fetchone()
             batt = row_bb['bb_max'] if row_bb else None
+            batt_gain = row_bb['bb_charged'] if row_bb else None
             data["batt"].append(batt)
+            data["batt_gain"].append(batt_gain)
 
             # Physiological Cost
             # Need active calories

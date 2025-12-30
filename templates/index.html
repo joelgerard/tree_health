@@ -640,6 +640,17 @@
                             visible: true
                         };
 
+                        const traceBattGain = {
+                            x: data.dates,
+                            y: data.batt_gain,
+                            name: 'Battery Gain',
+                            yaxis: 'y2',
+                            type: 'scatter',
+                            mode: 'lines',
+                            line: { color: '#5dade2', width: 2, dash: 'dot' },
+                            visible: true
+                        };
+
                         const traceRHR = {
                             x: data.dates,
                             y: data.rhr,
@@ -688,7 +699,7 @@
                             }
                         };
 
-                        Plotly.newPlot('trendChart', [traceSteps, traceBatt, traceRHR, traceStress, traceHRV], layout1, { responsive: true, displayModeBar: false });
+                        Plotly.newPlot('trendChart', [traceSteps, traceBatt, traceBattGain, traceRHR, traceStress, traceHRV], layout1, { responsive: true, displayModeBar: false });
 
                         // CHART 2: Metabolic Health
                         const traceCost = {
