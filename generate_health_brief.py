@@ -1,332 +1,223 @@
+# this shows trends for the AI
+
 import sqlite3
 import pandas as pd
-import os
-from datetime import datetime, timedelta
-import sys
-
 import argparse
-
-# Configuration
-DEFAULT_DB_DIR = os.path.expanduser("~/HealthData/DBs")
-TARGET_SLEEP_HOURS = 8.0
+import os
+import sys
+from datetime import datetime, timedelta
 
 def get_db_connection(db_path):
-    if not os.path.exists(db_path):
-        print(f"Error: Database not found at {db_path}")
-        sys.exit(1)
-    return sqlite3.connect(db_path)
-
-def parse_duration(duration_str):
-    """Parses 'HH:MM:SS.ssssss' or 'HH:MM:SS' into hours (float)."""
-    if not duration_str:
-        return 0.0
     try:
-        # Handle cases with or without microseconds
-        if '.' in duration_str:
-            t = datetime.strptime(duration_str, "%H:%M:%S.%f")
-        else:
-            t = datetime.strptime(duration_str, "%H:%M:%S")
-        hours = t.hour + t.minute / 60.0 + t.second / 3600.0
-        return hours
-    except ValueError:
-        return 0.0
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
+    except sqlite3.Error as e:
+        print(f"Error connecting to {db_path}: {e}")
+        sys.exit(1)
 
-def load_data(db_dir, limit=10):
+def analyze_health(db_dir, num_days):
     garmin_db = os.path.join(db_dir, "garmin.db")
+    
+    if not os.path.exists(garmin_db):
+        print(f"Error: Database not found at {garmin_db}")
+        sys.exit(1)
+
     conn = get_db_connection(garmin_db)
     
-    # Load separate tables
-    # We need last ~10 days to calculate 7 day window trends/lags safely
-    query_limit = limit
+    # Calculate date range
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=num_days + 1) # +1 for trend calculation
     
-    # daily_summary
-    df_daily = pd.read_sql_query(f"""
-        SELECT day, rhr, steps, calories_active, bb_max
-        FROM daily_summary 
-        ORDER BY day DESC LIMIT {query_limit}
-    """, conn)
+    query = """
+    SELECT 
+        d.day,
+        d.rhr,
+        d.steps,
+        d.stress_avg,
+        d.bb_charged,
+        d.calories_active,
+        h.last_night_avg as hrv,
+        s.score as sleep_score,
+        s.total_sleep_time
+    FROM daily_summary d
+    LEFT JOIN hrv h ON d.day = h.day
+    LEFT JOIN sleep s ON d.day = s.day
+    WHERE d.day >= ?
+    ORDER BY d.day DESC
+    """
     
-    # sleep
-    df_sleep = pd.read_sql_query(f"""
-        SELECT day, total_sleep, score
-        FROM sleep 
-        ORDER BY day DESC LIMIT {query_limit}
-    """, conn)
-    
-    # hrv
-    df_hrv = pd.read_sql_query(f"""
-        SELECT day, last_night_avg as hrv_avg
-        FROM hrv 
-        ORDER BY day DESC LIMIT {query_limit}
-    """, conn)
-    
-    conn.close()
-    
-    # Merge
-    # Ensure day is datetime for merging/sorting
-    df_daily['day'] = pd.to_datetime(df_daily['day']).dt.date
-    df_sleep['day'] = pd.to_datetime(df_sleep['day']).dt.date
-    df_hrv['day'] = pd.to_datetime(df_hrv['day']).dt.date
-    
-    df = pd.merge(df_daily, df_sleep, on='day', how='outer')
-    df = pd.merge(df, df_hrv, on='day', how='outer')
-    
-    # Sort descending
-    df = df.sort_values(by='day', ascending=False).reset_index(drop=True)
-    
-    return df
+    try:
+        df = pd.read_sql_query(query, conn, params=(start_date.isoformat(),))
+        conn.close()
+    except Exception as e:
+        print(f"Error executing query: {e}")
+        sys.exit(1)
 
-def generate_report(db_dir, days=7):
-    # Fetch enough data for trends/lags (days + buffer)
-    query_limit = days + 5
-    df = load_data(db_dir, limit=query_limit)
-    
     if df.empty:
-        print("No data found.")
+        print("No data found for the specified range.")
         return
 
-    # --- Pre-processing & Computations ---
+    # Data Pre-processing
+    df['cost'] = df.apply(lambda row: round((row['calories_active'] / row['steps'] * 1000), 1) if row['steps'] > 0 else 0, axis=1)
     
-    # Parse sleep
-    df['sleep_hours'] = df['total_sleep'].apply(parse_duration)
-    
-    # Physio Cost: (Active Calories / Steps * 1000)
-    # Avoid division by zero
-    df['physio_cost'] = df.apply(
-        lambda row: (row['calories_active'] / row['steps'] * 1000) if row['steps'] and row['steps'] > 0 else 0, axis=1
-    )
-    
-    # Shifted values for comparison (Previous Day)
-    # Since df is sorted DESC (Today is index 0, Yesterday is index 1)
-    df['prev_rhr'] = df['rhr'].shift(-1)
-    df['prev_bb_max'] = df['bb_max'].shift(-1)
-    df['prev_hrv'] = df['hrv_avg'].shift(-1)
-    df['prev_sleep_hours'] = df['sleep_hours'].shift(-1)
-    
-    # Deltas
-    # Delta RHR: Today - Yesterday
-    df['delta_rhr'] = df['rhr'] - df['prev_rhr']
-    # Delta Battery
-    df['delta_bb'] = df['bb_max'] - df['prev_bb_max']
-    # Sleep Trend (Delta Duration)
-    df['delta_sleep'] = df['sleep_hours'] - df['prev_sleep_hours']
-    
-    # Lag-2 Steps (Steps from 2 days ago)
-    # Today is index 0. T-2 is index 2.
-    # We can map it by shifting -2
-    df['lag_2_steps'] = df['steps'].shift(-2)
-    
-    # Sleep Debt: Last 3 days average vs 8.0 hours
-    # Rolling average in Pandas requires ascending order usually for 'window' to look back, 
-    # but here we have DESC. window=3 on DESC means current row + 2 FUTURE rows (which are past dates).
-    # So actually rolling(3) on DESC df starting at index 0 covers index 0, 1, 2 (Today, Yesterday, Day Before).
-    # That is exactly "Last 3 days average" including today.
-    # The requirement says "Last 3 days average". Usually implies T, T-1, T-2.
-    indexer = pd.api.indexers.FixedForwardWindowIndexer(window_size=3)
-    df['sleep_3d_avg'] = df['sleep_hours'].rolling(window=indexer, min_periods=1).mean()
-    df['sleep_debt'] = 8.0 - df['sleep_3d_avg']
+    # --- TREND ANALYSIS ---
+    # We need at least 2 days for basic trends, more for 7-day
+    if len(df) < 2:
+        print("Insufficient data for trend analysis.")
+        return
 
-    # --- Current Snapshot (Today) ---
     today = df.iloc[0]
+    yesterday = df.iloc[1]
     
-    # --- Logic & Status Determination ---
+    # Delta calculations
+    rhr_delta = today['rhr'] - yesterday['rhr']
+    batt_delta = today['bb_charged'] - yesterday['bb_charged']
+    hrv_delta = (today['hrv'] if pd.notnull(today['hrv']) else 0) - (yesterday['hrv'] if pd.notnull(yesterday['hrv']) else 0)
     
-    # 1. Calc Trends Numeric
-    # Compare Today (idx 0) vs Start of Period (idx days-1)
-    trend_window_days = days if days > 1 else 1 
-    compare_idx = days - 1 if days > 1 else 1
-    if compare_idx >= len(df):
-        compare_idx = len(df) - 1
-    has_trend_data = (len(df) > compare_idx) and (compare_idx > 0)
-    prev_period = df.iloc[compare_idx] if has_trend_data else None
-    
-    # Numeric Deltas for Logic
-    bb_delta = (today['bb_max'] - prev_period['bb_max']) if (has_trend_data and pd.notnull(prev_period['bb_max']) and pd.notnull(today['bb_max'])) else 0
-    
-    # 2. Define Flags
-    # RED (CRITICAL STOP)
-    is_critical_battery = (today['bb_max'] < 30) if pd.notnull(today['bb_max']) else False
-    is_metabolic_freeze = (today['rhr'] < 48) if pd.notnull(today['rhr']) else False
-    is_lag_2_risk = (today['lag_2_steps'] > 5000) if pd.notnull(today['lag_2_steps']) else False
-    
-    # YELLOW (CAUTION)
-    # Body Battery between 30 and 50
-    is_low_battery = (today['bb_max'] >= 30 and today['bb_max'] <= 50) if pd.notnull(today['bb_max']) else False
-    # Crashing Trend: Drop > 10%
-    is_crashing_trend = (bb_delta <= -10)
-    # High Cost
-    is_high_cost = (today['physio_cost'] > 35) if pd.notnull(today['physio_cost']) else False
-    # Low HRV
-    is_low_hrv = (today['hrv_avg'] < 45) if pd.notnull(today['hrv_avg']) else False
-    
-    # 3. Determine Verdict
-    status_light = "GREEN"
-    primary_driver = "Stable Trend"
-    
-    # Check RED first
-    if is_critical_battery:
-        status_light = "RED"
-        primary_driver = f"Critical Battery ({int(today['bb_max'])}%)"
-    elif is_metabolic_freeze:
-        status_light = "RED"
-        primary_driver = f"Metabolic Freeze ({int(today['rhr'])} bpm)"
-    elif is_lag_2_risk:
-        status_light = "RED"
-        primary_driver = f"Lag-2 Overload ({int(today['lag_2_steps'])} steps)"
-        
-    # Check YELLOW if not RED
-    elif is_low_battery:
-        status_light = "YELLOW"
-        primary_driver = f"Functional Insolvency ({int(today['bb_max'])}%)"
-    elif is_crashing_trend:
-        status_light = "YELLOW"
-        primary_driver = f"Crashing Trend ({int(bb_delta)}% drop)"
-    elif is_high_cost:
-        status_light = "YELLOW"
-        primary_driver = f"Inefficient Day (Cost {today['physio_cost']:.1f})"
-    elif is_low_hrv:
-        status_light = "YELLOW"
-        primary_driver = f"Nervous System Stuck (HRV {int(today['hrv_avg'])})"
-        
-    # Formatting Helpers
-    def fmt_trend(curr, prev, label_up="UP", label_down="DOWN", label_flat="FLAT", positive_is_good=True, is_rhr=False):
-        return "" # Using custom blocks
+    # 7-Day Battery Trend (Slope)
+    batt_trend_msg = "STABLE"
+    if len(df) >= 7:
+        avg_last_3 = df.iloc[0:3]['bb_charged'].mean()
+        avg_first_3 = df.iloc[-3:]['bb_charged'].mean()
+        diff = avg_last_3 - avg_first_3
+        if diff < -10:
+            batt_trend_msg = f"DRAINING ({int(diff)}% over period)"
+        elif diff > 10:
+            batt_trend_msg = f"CHARGING (+{int(diff)}% over period)"
+        else:
+            batt_trend_msg = f"STABLE ({int(diff)}%)"
+    else:
+        batt_trend_msg = f"STABLE ({int(batt_delta)}% vs yesterday)"
 
-    # --- Output ---
-    days_label = f"{days} Days" if days > 1 else "48h"
+    # --- RISK FLAGS ---
+    flags = {
+        "CRITICAL_BATTERY": False,
+        "METABOLIC_FREEZE": False,
+        "LAG_2_OVERLOAD": False,
+        "FUNCTIONAL_INSOLVENCY": False,
+        "CRASHING_TREND": False,
+        "HIGH_COST": False,
+        "NERVOUS_SYSTEM_STUCK": False,
+        "INEFFICIENT_RECOVERY": False  # <--- NEW FLAG
+    }
+    
+    # 1. Critical Battery (< 30)
+    if today['bb_charged'] < 30:
+        flags["CRITICAL_BATTERY"] = True
+        
+    # 2. Metabolic Freeze (RHR < 48)
+    if today['rhr'] < 48:
+        flags["METABOLIC_FREEZE"] = True
+        
+    # 3. Lag-2 Overload (Check 2 days ago)
+    if len(df) >= 3:
+        day_t2 = df.iloc[2]
+        if day_t2['steps'] > 5000:
+            flags["LAG_2_OVERLOAD"] = True
+            
+    # 4. Functional Insolvency (30-50%)
+    if 30 <= today['bb_charged'] <= 50:
+        flags["FUNCTIONAL_INSOLVENCY"] = True
+        
+    # 5. Crashing Trend
+    if "DRAINING" in batt_trend_msg:
+        flags["CRASHING_TREND"] = True
+        
+    # 6. High Cost (> 35)
+    if today['cost'] > 35:
+        flags["HIGH_COST"] = True
+        
+    # 7. Nervous System Stuck (HRV < 45)
+    if pd.notnull(today['hrv']) and today['hrv'] < 45:
+        flags["NERVOUS_SYSTEM_STUCK"] = True
+
+    # 8. Inefficient Recovery (NEW)
+    # Logic: Trying to rest (Steps < 2500) BUT Burning High Fuel (Cost > 35)
+    if today['steps'] < 2500 and today['cost'] > 35:
+        flags["INEFFICIENT_RECOVERY"] = True
+
+    # --- STATUS LIGHT LOGIC ---
+    status = "GREEN"
+    primary_driver = "None"
+    
+    if flags["CRITICAL_BATTERY"] or flags["METABOLIC_FREEZE"] or flags["LAG_2_OVERLOAD"]:
+        status = "RED"
+        if flags["CRITICAL_BATTERY"]: primary_driver = f"Critical Battery ({int(today['bb_charged'])}%)"
+        elif flags["METABOLIC_FREEZE"]: primary_driver = f"Metabolic Freeze ({int(today['rhr'])} bpm)"
+        elif flags["LAG_2_OVERLOAD"]: primary_driver = "Lag-2 Overload Risk"
+        
+    elif flags["FUNCTIONAL_INSOLVENCY"] or flags["CRASHING_TREND"] or flags["HIGH_COST"] or flags["NERVOUS_SYSTEM_STUCK"]:
+        status = "YELLOW"
+        if flags["INEFFICIENT_RECOVERY"]: primary_driver = "Inefficient Recovery (Sensory Hangover)"
+        elif flags["FUNCTIONAL_INSOLVENCY"]: primary_driver = f"Functional Insolvency ({int(today['bb_charged'])}%)"
+        elif flags["HIGH_COST"]: primary_driver = f"High Cost Day ({today['cost']})"
+        elif flags["CRASHING_TREND"]: primary_driver = "Battery Draining Trend"
+        elif flags["NERVOUS_SYSTEM_STUCK"]: primary_driver = "Nervous System Stuck"
+
+    # --- OUTPUT REPORT ---
     print(f"=== CURRENT STATUS ({today['day']}) ===")
-    print(f"STATUS_LIGHT: [{status_light}]")
+    print(f"STATUS_LIGHT: [{status}]")
     print(f"PRIMARY_DRIVER: [{primary_driver}]")
     print("")
-    print(f"=== TREND ANALYSIS (Last {days_label}) ===")
+    print(f"=== TREND ANALYSIS (Last {num_days} Days) ===")
     
-    # RHR Trend
-    rhr_trend_str = "N/A"
-    if has_trend_data and pd.notnull(today['rhr']) and pd.notnull(prev_period['rhr']):
-        diff = today['rhr'] - prev_period['rhr']
-        if abs(diff) < 2:
-            rhr_trend_str = f"STABLE ({int(diff):+d} bpm)"
-        elif diff > 0:
-            rhr_trend_str = f"RISING ({int(diff):+d} bpm)"
-        else:
-            rhr_trend_str = f"DROPPING ({int(diff):+d} bpm)"
-
-    # HRV Trend
-    hrv_trend_str = "N/A"
-    if has_trend_data and pd.notnull(today['hrv_avg']) and pd.notnull(prev_period['hrv_avg']):
-        diff = today['hrv_avg'] - prev_period['hrv_avg']
-        p = int(prev_period['hrv_avg'])
-        c = int(today['hrv_avg'])
-        if abs(diff) < 2:
-            hrv_trend_str = f"FLAT ({p} -> {c})"
-        elif diff > 0:
-            hrv_trend_str = f"RISING ({p} -> {c})"
-        else:
-            hrv_trend_str = f"DROPPING ({p} -> {c})"
-            
-    # Battery Trend (Using computed bb_delta)
-    batt_trend_str = "N/A"
-    if has_trend_data and pd.notnull(today['bb_max']) and pd.notnull(prev_period['bb_max']):
-        suffix = f"over {days_label}" if days > 1 else "from yesterday"
-        if bb_delta <= -20:
-            batt_trend_str = f"CRASHING ({int(bb_delta)}% {suffix})"
-        elif bb_delta < -5:
-            batt_trend_str = f"DRAINING ({int(bb_delta)}% {suffix})"
-        elif bb_delta > 5:
-            batt_trend_str = f"CHARGING ({int(bb_delta):+d}% {suffix})"
-        else:
-            batt_trend_str = f"STABLE ({int(bb_delta):+d}%)"
-
+    rhr_trend_str = "STABLE"
+    if rhr_delta > 0: rhr_trend_str = "RISING"
+    elif rhr_delta < 0: rhr_trend_str = "FALLING"
+    print(f"RHR_TREND:      {rhr_trend_str} ({int(rhr_delta):+d} bpm)")
+    
+    hrv_trend_str = "FLAT"
+    if hrv_delta > 1: hrv_trend_str = "RISING"
+    elif hrv_delta < -1: hrv_trend_str = "DROPPING"
+    print(f"HRV_TREND:      {hrv_trend_str} ({int(yesterday['hrv'] if pd.notnull(yesterday['hrv']) else 0)} -> {int(today['hrv'] if pd.notnull(today['hrv']) else 0)})")
+    
+    print(f"BATTERY_TREND:  {batt_trend_msg}")
+    
     # Sleep Trend
-    sleep_trend_str = "N/A"
-    if has_trend_data and pd.notnull(today['sleep_hours']) and pd.notnull(prev_period['sleep_hours']):
-        diff = today['sleep_hours'] - prev_period['sleep_hours']
-        if diff > 1.5:
-            sleep_trend_str = f"REBOUND ({diff:+.1f}h duration)"
-        elif diff < -1.5:
-             sleep_trend_str = f"DEPRIVATION ({diff:+.1f}h duration)"
-        else:
-             sleep_trend_str = f"STEADY ({diff:+.1f}h)"
-             
-    print(f"RHR_TREND:      {rhr_trend_str}")
-    print(f"HRV_TREND:      {hrv_trend_str}")
-    print(f"BATTERY_TREND:  {batt_trend_str}")
-    print(f"SLEEP_TREND:    {sleep_trend_str}")
+    avg_sleep = df['total_sleep_time'].mean() / 60 / 60 / 1000 if 'total_sleep_time' in df.columns else 0 # ms to hours
+    # Simple check vs 8h
+    sleep_diff = (today['total_sleep_time'] / 60 / 60 / 1000) - 8.0 if pd.notnull(today['total_sleep_time']) else 0
+    print(f"SLEEP_TREND:    {'STEADY' if abs(sleep_diff) < 1 else ('REBOUND' if sleep_diff > 0 else 'DEBT')} ({sleep_diff:+.1f}h vs 8h target)")
+    
     print("")
     print("=== RISK FLAGS ===")
-    print(f"[{'X' if is_critical_battery else ' '}] Critical Battery (<30)")
-    print(f"[{'X' if is_metabolic_freeze else ' '}] Metabolic Freeze (<48 bpm)")
-    print(f"[{'X' if is_lag_2_risk else ' '}] Lag-2 Overload (>5k steps 48h ago)")
-    print(f"[{'X' if is_low_battery else ' '}] Functional Insolvency (30-50%)")
-    print(f"[{'X' if is_crashing_trend else ' '}] Crashing Trend (>10% drop)")
-    print(f"[{'X' if is_high_cost else ' '}] High Cost Day (>35 cost)")
-    print(f"[{'X' if is_low_hrv else ' '}] Nervous System Stuck (HRV < 45)")
-    print("")
-    print(f"=== DATA TABLE (Last {days} Days) ===")
-    print("Day        | RHR | HRV | Batt | Sleep | Steps | Cost")
-    print("----------------------------------------------------")
+    flag_labels = {
+        "CRITICAL_BATTERY": "Critical Battery (<30)",
+        "METABOLIC_FREEZE": "Metabolic Freeze (<48 bpm)",
+        "LAG_2_OVERLOAD": "Lag-2 Overload (>5k steps 48h ago)",
+        "FUNCTIONAL_INSOLVENCY": "Functional Insolvency (30-50%)",
+        "CRASHING_TREND": "Crashing Trend (>10% drop)",
+        "HIGH_COST": "High Cost Day (>35 cost)",
+        "NERVOUS_SYSTEM_STUCK": "Nervous System Stuck (HRV < 45)",
+        "INEFFICIENT_RECOVERY": "Inefficient Recovery (Low Steps + High Cost)"
+    }
     
-    # Print last N days
-    for i in range(days):
-        if i >= len(df):
-            break
-        row = df.iloc[i]
-        
-        d_str = str(row['day'])
-        rhr = int(row['rhr']) if pd.notnull(row['rhr']) else "N/A"
-        hrv = int(row['hrv_avg']) if pd.notnull(row['hrv_avg']) else "N/A"
-        batt = int(row['bb_max']) if pd.notnull(row['bb_max']) else "N/A"
-        
-        sleep_val = "N/A"
-        if pd.notnull(row['sleep_hours']):
-            # Convert decimal hours to e.g. 7.5 -> maybe user wants minutes? 
-            # Example shows "88" -> 88 what? 88 sleep score? Or 88 hours? No.
-            # Example: "Sleep | 88". 
-            # Ah, maybe sleep SCORE?
-            # Requirement 2 says "Sleep Debt: (Last 3 days average vs 8.0 hours)".
-            # But the table example shows "Sleep | 88", "Sleep | 63".
-            # Those look like Sleep SCORES, not duration.
-            # But "Computations" asked for "Sleep Debt".
-            # If the user wants the TABLE to match the example, I should probably print Sleep SCORE in the table if available.
-            # Schema had `sleep_score`?
-            # Let's check schema for `sleep` table again. 
-            # `score INTEGER`.
-            # I should fetch `score` too!
-            pass
-        
-        # Re-fetching sleep score to be safe or just printing duration if score missing?
-        # User REQ 2: "Sleep Debt: (Last 3 days average vs 8.0 hours)". 
-        # User REQ 4: "Sleep | 88". That is definitely a score.
-        # I will modify load_data to fetch `score` too.
-        
-        steps = int(row['steps']) if pd.notnull(row['steps']) else "N/A"
-        cost = f"{row['physio_cost']:.0f}" if pd.notnull(row['physio_cost']) and row['physio_cost'] > 0 else "--"
-        
-        # Let's pivot to fetch sleep score dynamically in this loop if I didn't fetch it, 
-        # or better, Update load_data to fetch it. I will update load_data.
-        # For now, I'll put a placeholder variable name and I will update the query above.
-        
-        # Wait, I am writing the file content right now. I can just edit the string I am writing.
-        # I will scroll up and add `score` to `df_sleep` query.
-        
-        # Formatted line (using variables assuming I added score)
-        # I will assume I added score to the query in the `load_data` function.
-        
-        # Update: I will modify the query string in `load_data` to `SELECT day, total_sleep, score ...`
-        
-        s_score = "N/A"
-        if 'score' in row and pd.notnull(row['score']):
-            s_score = int(row['score'])
-        elif pd.notnull(row['sleep_hours']):
-             # Fallback if no score but duration exists (unlikely in Garmin data if duration exists)
-             s_score = f"{row['sleep_hours']:.1f}h"
+    for key, label in flag_labels.items():
+        mark = "X" if flags.get(key) else " "
+        print(f"[{mark}] {label}")
 
-        print(f"{d_str:10} | {str(rhr):3} | {str(hrv):3} | {str(batt):4} | {str(s_score):5} | {str(steps):5} | {cost}")
+    print("")
+    print(f"=== DATA TABLE (Last {num_days} Days) ===")
+    print(f"{'Day':<10} | {'RHR':<3} | {'HRV':<3} | {'Batt':<4} | {'Sleep':<5} | {'Steps':<5} | {'Cost':<4}")
+    print("-" * 52)
+    
+    for index, row in df.head(num_days).iterrows():
+        day_str = row['day']
+        rhr = int(row['rhr']) if pd.notnull(row['rhr']) else "--"
+        hrv = int(row['hrv']) if pd.notnull(row['hrv']) else "--"
+        batt = int(row['bb_charged']) if pd.notnull(row['bb_charged']) else "--"
+        sleep = int(row['score']) if pd.notnull(row['score']) else "--"
+        steps = int(row['steps']) if pd.notnull(row['steps']) else "--"
+        cost = int(row['cost'])
+        
+        print(f"{day_str:<10} | {rhr:<3} | {hrv:<3} | {batt:<4} | {sleep:<5} | {steps:<5} | {cost:<4}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate Health Brief")
-    parser.add_argument("-f", "--folder", type=str, default=DEFAULT_DB_DIR, help="Path to database folder")
-    parser.add_argument("-n", "--days", type=int, default=7, help="Number of days to display")
+    parser = argparse.ArgumentParser(description="Generate Health Commander's Brief")
+    parser.add_argument('-f', '--folder', required=True, help="Path to DB folder")
+    parser.add_argument('-n', '--days', type=int, default=7, help="Number of days to analyze")
+    
     args = parser.parse_args()
     
-    generate_report(args.folder, args.days)
+    analyze_health(args.folder, args.days)
