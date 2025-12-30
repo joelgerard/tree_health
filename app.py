@@ -612,7 +612,7 @@ def calculate_metrics(target_date, conn, conn_activities):
         "status": status,
         "reason": reason,
         "target_steps": target_steps,
-        "metrics": {"rhr": rhr, "bb": bb_charged, "physio_cost": physio_cost}
+        "metrics": {"rhr": rhr, "bb": bb_charged, "physio_cost": physio_cost, "steps": steps}
     }
 
 @app.route('/')
@@ -705,8 +705,16 @@ def index():
         conn.close()
     except Exception as e:
         print(f"Error calculating recovery score: {e}")
+
+    # 5. Logic Flags
+    current_steps = metrics_raw['metrics'].get('steps', 0)
+    current_cost = metrics_raw['metrics'].get('physio_cost', 0)
+    
+    flags = {
+        "INEFFICIENT_RECOVERY": (current_steps < 2500 and current_cost > 35)
+    }
         
-    return render_template('index.html', fresh=is_fresh, last_data=last_data, last_hrv=last_hrv, last_sleep=last_sleep, metrics=metrics, recovery=recovery_score, trends=trends)
+    return render_template('index.html', fresh=is_fresh, last_data=last_data, last_hrv=last_hrv, last_sleep=last_sleep, metrics=metrics, recovery=recovery_score, trends=trends, flags=flags)
 
 @app.route('/sync', methods=['POST'])
 def sync():
