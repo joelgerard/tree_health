@@ -409,14 +409,14 @@
             <div class="col-md-6 col-lg-3">
                 <div class="metric-card p-4 h-100">
                     <div class="d-flex justify-content-between mb-3">
-                        <small class="text-secondary">Sleep Recharge</small>
+                        <small class="text-secondary">Sleep Recharge (Gain)</small>
                         <div class="status-indicator status-{{ metrics.sleep_recharge.status }}"></div>
                     </div>
                     <h5 class="card-title fw-normal mb-1 {{ 'text-' + metrics.sleep_recharge.status }}">
                         {{ metrics.sleep_recharge.msg }}
                     </h5>
                     {% if metrics.today_data_available %}
-                    <p class="text-secondary small mt-2 mb-0">Body Battery</p>
+                    <p class="text-secondary small mt-2 mb-0">Battery Gain</p>
                     {% else %}
                     <p class="text-warning small mt-2 mb-0">No Data for Today</p>
                     {% endif %}

@@ -671,7 +671,7 @@ def index():
 
     # D. Sleep Recharge (The Battery)
     if "Poor Recharge" in metrics_raw['reason']:
-        sleep_status = {"status": "RED", "msg": "Body Battery < 50%"}
+        sleep_status = {"status": "RED", "msg": f"Battery Gain {metrics_raw['metrics']['bb']}% < 50%"}
     else:
         sleep_status = {"status": "GREEN", "msg": "Recharge Sufficient"}
         
