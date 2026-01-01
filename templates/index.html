@@ -7,6 +7,8 @@
     <title>Recovery Dashboard</title>
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
     <!-- HTMX -->
@@ -256,11 +258,29 @@
 
                 <div class="d-flex align-items-center gap-3">
                     <!-- Date Picker -->
-                    <div class="glass-panel p-2 px-3">
-                        <input type="date" class="form-control form-control-sm bg-transparent border-0 text-dark fw-bold"
+                    <div class="glass-panel p-1 px-2 d-flex align-items-center gap-1">
+                        <button class="btn btn-sm btn-outline-dark border-0" onclick="changeDate(-1)"
+                            title="Previous Day">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <input type="date"
+                            class="form-control form-control-sm bg-transparent border-0 text-dark fw-bold"
                             value="{{ selected_date }}" onchange="window.location.href = '/?date=' + this.value"
-                            style="color-scheme: light;">
+                            style="color-scheme: light; width: auto;">
+                        <button class="btn btn-sm btn-outline-dark border-0" onclick="changeDate(1)" title="Next Day">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
                     </div>
+
+                    <script>
+                        function changeDate(offset) {
+                            const dateInput = document.querySelector('input[type="date"]');
+                            const currentDate = new Date(dateInput.value);
+                            currentDate.setDate(currentDate.getDate() + offset);
+                            const newDate = currentDate.toISOString().split('T')[0];
+                            window.location.href = '/?date=' + newDate;
+                        }
+                    </script>
 
                     {% if not fresh %}
                     <button class="btn btn-primary px-4 py-2 rounded-pill d-flex align-items-center gap-2"
@@ -438,10 +458,11 @@
                         <small class="text-warning-emphasis">Internal Load</small>
                     </div>
                     <p class="text-warning-emphasis small mt-2 mb-3" style="line-height: 1.4;">
-                        Your body is sitting still, but your engine is running high to process yesterday's activity. This is an expected
+                        Your body is sitting still, but your engine is running high to process yesterday's activity.
+                        This is an expected
                         'Sensory Tax.' Stay horizontal to help the engine cool down.
                     </p>
-                
+
                     <!-- RPM Gauge Visual -->
                     <div class="mt-auto">
                         <div class="d-flex justify-content-between small text-warning-emphasis mb-1">
@@ -449,8 +470,8 @@
                             <span class="fw-bold">High Idle</span>
                         </div>
                         <div class="progress" style="height: 6px; background-color: rgba(0,0,0,0.1);">
-                            <div class="progress-bar bg-warning" role="progressbar" style="width: 75%;" aria-valuenow="75"
-                                aria-valuemin="0" aria-valuemax="100"></div>
+                            <div class="progress-bar bg-warning" role="progressbar" style="width: 75%;"
+                                aria-valuenow="75" aria-valuemin="0" aria-valuemax="100"></div>
                         </div>
                     </div>
                 </div>
@@ -490,7 +511,7 @@
             <div class="col-lg-6">
                 <div class="glass-panel p-4 h-100">
                     <h6 class="text-secondary text-uppercase letter-spacing-2 mb-4">Trend Compass</h6>
-        
+
                     <div class="row g-0 align-items-center text-center">
                         <!-- 1. Body Battery -->
                         <div class="col-3 border-end border-secondary border-opacity-10">
@@ -499,57 +520,65 @@
                             <div class="d-flex gap-2 justify-content-center mt-2" style="font-size: 0.75rem;">
                                 <div>
                                     <span class="text-secondary opacity-75">7d</span>
-                                    <span class="{{ 'text-success' if trends.batt.trend_7d > 0 else 'text-danger' }} fw-bold">
-                                        {% if trends.batt.trend_7d > 0 %}↗{% elif trends.batt.trend_7d < 0 %}↘{% else %}→{% endif %} {{
-                                            trends.batt.trend_7d|abs }}% </span>
+                                    <span
+                                        class="{{ 'text-success' if trends.batt.trend_7d > 0 else 'text-danger' }} fw-bold">
+                                        {% if trends.batt.trend_7d > 0 %}↗{% elif trends.batt.trend_7d < 0 %}↘{% else
+                                            %}→{% endif %} {{ trends.batt.trend_7d|abs }}% </span>
                                 </div>
                                 <div>
                                     <span class="text-secondary opacity-75">3d</span>
-                                    <span class="{{ 'text-success' if trends.batt.trend_3d > 0 else 'text-danger' }} fw-bold">
-                                        {% if trends.batt.trend_3d > 0 %}↗{% elif trends.batt.trend_3d < 0 %}↘{% else %}→{% endif %} {{
-                                            trends.batt.trend_3d|abs }}% </span>
-                                            </div>
-                                            </div>
-                                            </div>
-                                            <!-- 2. HRV -->
-                                            <div class="col-3 border-end border-secondary border-opacity-10">
-                                                <div class="text-secondary small mb-1">HRV (Avg)</div>
-                                                <div class="h3 fw-bold mb-0 text-success">{{ trends.hrv.val }} <small class="text-secondary fs-6">ms</small></div>
-                                                <div class="d-flex gap-2 justify-content-center mt-2" style="font-size: 0.75rem;">
-                                                    <div>
+                                    <span
+                                        class="{{ 'text-success' if trends.batt.trend_3d > 0 else 'text-danger' }} fw-bold">
+                                        {% if trends.batt.trend_3d > 0 %}↗{% elif trends.batt.trend_3d < 0 %}↘{% else
+                                            %}→{% endif %} {{ trends.batt.trend_3d|abs }}% </span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 2. HRV -->
+                        <div class="col-3 border-end border-secondary border-opacity-10">
+                            <div class="text-secondary small mb-1">HRV (Avg)</div>
+                            <div class="h3 fw-bold mb-0 text-success">{{ trends.hrv.val }} <small
+                                    class="text-secondary fs-6">ms</small></div>
+                            <div class="d-flex gap-2 justify-content-center mt-2" style="font-size: 0.75rem;">
+                                <div>
                                     <span class="text-secondary opacity-75">7d</span>
-                                    <span class="{{ 'text-success' if trends.hrv.trend_7d > 0 else 'text-danger' }} fw-bold">
-                                        {% if trends.hrv.trend_7d > 0 %}↗{% elif trends.hrv.trend_7d < 0 %}↘{% else %}→{% endif %} {{
-                                            trends.hrv.trend_7d|abs }} </span>
-                                            </div>
-                                            <div>
-                                                <span class="text-secondary opacity-75">3d</span>
-                                                <span class="{{ 'text-success' if trends.hrv.trend_3d > 0 else 'text-danger' }} fw-bold">
-                                                    {% if trends.hrv.trend_3d > 0 %}↗{% elif trends.hrv.trend_3d < 0 %}↘{% else %}→{% endif %} {{
-                                                        trends.hrv.trend_3d|abs }} </span>
-                                            </div>
-                                            </div>
-                                            </div>
+                                    <span
+                                        class="{{ 'text-success' if trends.hrv.trend_7d > 0 else 'text-danger' }} fw-bold">
+                                        {% if trends.hrv.trend_7d > 0 %}↗{% elif trends.hrv.trend_7d < 0 %}↘{% else
+                                            %}→{% endif %} {{ trends.hrv.trend_7d|abs }} </span>
+                                </div>
+                                <div>
+                                    <span class="text-secondary opacity-75">3d</span>
+                                    <span
+                                        class="{{ 'text-success' if trends.hrv.trend_3d > 0 else 'text-danger' }} fw-bold">
+                                        {% if trends.hrv.trend_3d > 0 %}↗{% elif trends.hrv.trend_3d < 0 %}↘{% else
+                                            %}→{% endif %} {{ trends.hrv.trend_3d|abs }} </span>
+                                </div>
+                            </div>
+                        </div>
 
                         <!-- 3. RHR -->
                         <div class="col-3 border-end border-secondary border-opacity-10">
                             <div class="text-secondary small mb-1">Resting HR</div>
-                            <div class="h3 fw-bold mb-0">{{ trends.rhr.val }} <small class="text-secondary fs-6">bpm</small></div>
+                            <div class="h3 fw-bold mb-0">{{ trends.rhr.val }} <small
+                                    class="text-secondary fs-6">bpm</small></div>
                             <div class="d-flex gap-2 justify-content-center mt-2" style="font-size: 0.75rem;">
                                 <div>
                                     <span class="text-secondary opacity-75">7d</span>
-                                    <span class="{{ 'text-success' if trends.rhr.trend_7d < 0 else 'text-danger' }} fw-bold">
-                                        {% if trends.rhr.trend_7d > 0 %}↗{% elif trends.rhr.trend_7d < 0 %}↘{% else %}→{% endif %} {{
-                                            trends.rhr.trend_7d|abs }} </span>
-                                            </div>
+                                    <span
+                                        class="{{ 'text-success' if trends.rhr.trend_7d < 0 else 'text-danger' }} fw-bold">
+                                        {% if trends.rhr.trend_7d > 0 %}↗{% elif trends.rhr.trend_7d < 0 %}↘{% else
+                                            %}→{% endif %} {{ trends.rhr.trend_7d|abs }} </span>
+                                </div>
                                 <div>
                                     <span class="text-secondary opacity-75">3d</span>
-                                    <span class="{{ 'text-success' if trends.rhr.trend_3d < 0 else 'text-danger' }} fw-bold">
-                                        {% if trends.rhr.trend_3d > 0 %}↗{% elif trends.rhr.trend_3d < 0 %}↘{% else %}→{% endif %} {{
-                                            trends.rhr.trend_3d|abs }} </span>
-                                            </div>
-                                            </div>
-                                            </div>
+                                    <span
+                                        class="{{ 'text-success' if trends.rhr.trend_3d < 0 else 'text-danger' }} fw-bold">
+                                        {% if trends.rhr.trend_3d > 0 %}↗{% elif trends.rhr.trend_3d < 0 %}↘{% else
+                                            %}→{% endif %} {{ trends.rhr.trend_3d|abs }} </span>
+                                </div>
+                            </div>
+                        </div>
 
                         <!-- 4. Stress -->
                         <div class="col-3">
@@ -558,274 +587,276 @@
                             <div class="d-flex gap-2 justify-content-center mt-2" style="font-size: 0.75rem;">
                                 <div>
                                     <span class="text-secondary opacity-75">7d</span>
-                                    <span class="{{ 'text-success' if trends.stress.trend_7d < 0 else 'text-danger' }} fw-bold">
-                                        {% if trends.stress.trend_7d > 0 %}↗{% elif trends.stress.trend_7d < 0 %}↘{% else %}→{% endif %} {{
-                                            trends.stress.trend_7d|abs }} </span>
-                                            </div>
+                                    <span
+                                        class="{{ 'text-success' if trends.stress.trend_7d < 0 else 'text-danger' }} fw-bold">
+                                        {% if trends.stress.trend_7d > 0 %}↗{% elif trends.stress.trend_7d < 0 %}↘{%
+                                            else %}→{% endif %} {{ trends.stress.trend_7d|abs }} </span>
+                                </div>
                                 <div>
                                     <span class="text-secondary opacity-75">3d</span>
-                                    <span class="{{ 'text-success' if trends.stress.trend_3d < 0 else 'text-danger' }} fw-bold">
-                                        {% if trends.stress.trend_3d > 0 %}↗{% elif trends.stress.trend_3d < 0 %}↘{% else %}→{% endif %} {{
-                                            trends.stress.trend_3d|abs }} </span>
-                                            </div>
-                                            </div>
-                                            </div>
-                                            </div>
-                                            </div>
-                                            </div>
-        
+                                    <span
+                                        class="{{ 'text-success' if trends.stress.trend_3d < 0 else 'text-danger' }} fw-bold">
+                                        {% if trends.stress.trend_3d > 0 %}↗{% elif trends.stress.trend_3d < 0 %}↘{%
+                                            else %}→{% endif %} {{ trends.stress.trend_3d|abs }} </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                                    <!-- Widget 2: Efficiency Report -->
-                                    <div class="col-lg-6">
-                                        <div class="glass-panel p-4 h-100">
-                                            <h6 class="text-secondary text-uppercase letter-spacing-2 mb-4">Efficiency Report
-                                                (Cost)
-                                            </h6>
-                                            <div class="row g-2">
-                                                {% for cost in trends.recent_costs %}
-                                                <div class="col-4">
-                                                    <div class="p-3 rounded-3 text-center border transition-hover"
-                                                        style="background: rgba(255,255,255,0.5); border-color: var(--glass-border);">
-                                                        <div class="small text-secondary mb-1">{{ cost.label }}</div>
-                                                        <div class="h4 fw-bold mb-0 text-{{ cost.status }}">{{ cost.cost }}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {% endfor %}
-                                            </div>
-                                            <div class="mt-3 text-center small text-secondary">
-                                                Target < 30 &bull; Scale: Cals/1k Steps </div>
-                                            </div>
-                                        </div>
-                                    </div>
 
-        <!-- Trend Analysis -->
-        <h5 class="text-secondary mb-3 ps-2">14-Day Trend Analysis</h5>
-        <div class="glass-panel p-4 mb-4">
-            <h5 class="text-secondary text-uppercase letter-spacing-2 mb-4">Activity & Capacity (14-Day)</h5>
-            <div id="trendChart" style="height: 350px;"></div>
-        </div>
-<!-- Biometrics Chart -->
-<div class="glass-panel p-4 mb-4">
-    <h5 class="text-secondary text-uppercase letter-spacing-2 mb-4">Metabolic Health (14-Day)</h5>
-    <div id="biometricsChart" style="height: 350px;"></div>
-</div>
+            <!-- Widget 2: Efficiency Report -->
+            <div class="col-lg-6">
+                <div class="glass-panel p-4 h-100">
+                    <h6 class="text-secondary text-uppercase letter-spacing-2 mb-4">Efficiency Report
+                        (Cost)
+                    </h6>
+                    <div class="row g-2">
+                        {% for cost in trends.recent_costs %}
+                        <div class="col-4">
+                            <div class="p-3 rounded-3 text-center border transition-hover"
+                                style="background: rgba(255,255,255,0.5); border-color: var(--glass-border);">
+                                <div class="small text-secondary mb-1">{{ cost.label }}</div>
+                                <div class="h4 fw-bold mb-0 text-{{ cost.status }}">{{ cost.cost }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="mt-3 text-center small text-secondary">
+                        Target < 30 &bull; Scale: Cals/1k Steps </div>
+                    </div>
+                </div>
+            </div>
 
-        <script>
-            document.addEventListener('DOMContentLoaded', function () {
-                // Fetch Trend Data
-                fetch('/api/data?date={{ selected_date }}')
-                    .then(response => response.json())
-                    .then(data => {
-                        // CHART 1: Activity & Capacity
-                        const traceSteps = {
-                            x: data.dates,
-                            y: data.steps,
-                            name: 'Steps',
-                            type: 'bar',
-                            marker: {
-                                color: 'rgba(46, 204, 113, 0.4)',
-                                line: { color: 'rgba(46, 204, 113, 0.8)', width: 1.5 }
-                            }
-                        };
+            <!-- Trend Analysis -->
+            <h5 class="text-secondary mb-3 ps-2">14-Day Trend Analysis</h5>
+            <div class="glass-panel p-4 mb-4">
+                <h5 class="text-secondary text-uppercase letter-spacing-2 mb-4">Activity & Capacity (14-Day)</h5>
+                <div id="trendChart" style="height: 350px;"></div>
+            </div>
+            <!-- Biometrics Chart -->
+            <div class="glass-panel p-4 mb-4">
+                <h5 class="text-secondary text-uppercase letter-spacing-2 mb-4">Metabolic Health (14-Day)</h5>
+                <div id="biometricsChart" style="height: 350px;"></div>
+            </div>
 
-                        const traceBatt = {
-                            x: data.dates,
-                            y: data.batt,
-                            name: 'Body Battery (Max)',
-                            yaxis: 'y2',
-                            type: 'scatter',
-                            mode: 'lines',
-                            line: { color: '#3498db', width: 2 },
-                            visible: true
-                        };
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    // Fetch Trend Data
+                    fetch('/api/data?date={{ selected_date }}')
+                        .then(response => response.json())
+                        .then(data => {
+                            // CHART 1: Activity & Capacity
+                            const traceSteps = {
+                                x: data.dates,
+                                y: data.steps,
+                                name: 'Steps',
+                                type: 'bar',
+                                marker: {
+                                    color: 'rgba(46, 204, 113, 0.4)',
+                                    line: { color: 'rgba(46, 204, 113, 0.8)', width: 1.5 }
+                                }
+                            };
 
-                        const traceBattGain = {
-                            x: data.dates,
-                            y: data.batt_gain,
-                            name: 'Battery Gain',
-                            yaxis: 'y2',
-                            type: 'scatter',
-                            mode: 'lines',
-                            line: { color: '#5dade2', width: 2, dash: 'dot' },
-                            visible: true
-                        };
+                            const traceBatt = {
+                                x: data.dates,
+                                y: data.batt,
+                                name: 'Body Battery (Max)',
+                                yaxis: 'y2',
+                                type: 'scatter',
+                                mode: 'lines',
+                                line: { color: '#3498db', width: 2 },
+                                visible: true
+                            };
 
-                        const traceRHR = {
-                            x: data.dates,
-                            y: data.rhr,
-                            name: 'RHR',
-                            yaxis: 'y2',
-                            type: 'scatter',
-                            mode: 'lines',
-                            line: { color: '#e74c3c', width: 2 }
-                        };
+                            const traceBattGain = {
+                                x: data.dates,
+                                y: data.batt_gain,
+                                name: 'Battery Gain',
+                                yaxis: 'y2',
+                                type: 'scatter',
+                                mode: 'lines',
+                                line: { color: '#5dade2', width: 2, dash: 'dot' },
+                                visible: true
+                            };
 
-                        const traceStress = {
-                            x: data.dates,
-                            y: data.stress,
-                            name: 'Stress',
-                            yaxis: 'y2',
-                            type: 'scatter',
-                            mode: 'lines',
-                            line: { color: '#9b59b6', width: 2, dash: 'dot' }
-                        };
+                            const traceRHR = {
+                                x: data.dates,
+                                y: data.rhr,
+                                name: 'RHR',
+                                yaxis: 'y2',
+                                type: 'scatter',
+                                mode: 'lines',
+                                line: { color: '#e74c3c', width: 2 }
+                            };
 
-                        const traceHRV = {
-                            x: data.dates,
-                            y: data.hrv,
-                            name: 'HRV',
-                            yaxis: 'y2',
-                            type: 'scatter',
-                            mode: 'lines',
-                            line: { color: '#1abc9c', width: 2 }
-                        };
+                            const traceStress = {
+                                x: data.dates,
+                                y: data.stress,
+                                name: 'Stress',
+                                yaxis: 'y2',
+                                type: 'scatter',
+                                mode: 'lines',
+                                line: { color: '#9b59b6', width: 2, dash: 'dot' }
+                            };
 
-                        const layout1 = {
-                            title: { text: '', font: { color: '#2c3e50' } },
-                            paper_bgcolor: 'rgba(0,0,0,0)',
-                            plot_bgcolor: 'rgba(0,0,0,0)',
-                            showlegend: true,
-                            legend: { x: 0, y: 1.15, orientation: 'h', font: { color: '#7f8c8d' } },
-                            margin: { l: 50, r: 50, t: 40, b: 40 },
-                            xaxis: { color: '#7f8c8d', showgrid: false },
-                            yaxis: { title: 'Steps', color: '#7f8c8d', showgrid: true, gridcolor: 'rgba(0,0,0,0.05)' },
-                            yaxis2: {
-                                title: 'Biometrics',
-                                overlaying: 'y',
-                                side: 'right',
-                                color: '#2c3e50',
-                                showgrid: false
-                            }
-                        };
+                            const traceHRV = {
+                                x: data.dates,
+                                y: data.hrv,
+                                name: 'HRV',
+                                yaxis: 'y2',
+                                type: 'scatter',
+                                mode: 'lines',
+                                line: { color: '#1abc9c', width: 2 }
+                            };
 
-                        Plotly.newPlot('trendChart', [traceSteps, traceBatt, traceBattGain, traceRHR, traceStress, traceHRV], layout1, { responsive: true, displayModeBar: false });
+                            const layout1 = {
+                                title: { text: '', font: { color: '#2c3e50' } },
+                                paper_bgcolor: 'rgba(0,0,0,0)',
+                                plot_bgcolor: 'rgba(0,0,0,0)',
+                                showlegend: true,
+                                legend: { x: 0, y: 1.15, orientation: 'h', font: { color: '#7f8c8d' } },
+                                margin: { l: 50, r: 50, t: 40, b: 40 },
+                                xaxis: { color: '#7f8c8d', showgrid: false },
+                                yaxis: { title: 'Steps', color: '#7f8c8d', showgrid: true, gridcolor: 'rgba(0,0,0,0.05)' },
+                                yaxis2: {
+                                    title: 'Biometrics',
+                                    overlaying: 'y',
+                                    side: 'right',
+                                    color: '#2c3e50',
+                                    showgrid: false
+                                }
+                            };
 
-                        // CHART 2: Metabolic Health
-                        const traceCost = {
-                            x: data.dates,
-                            y: data.cost,
-                            name: 'Physio Cost',
-                            type: 'scatter',
-                            mode: 'lines+markers',
-                            line: { color: '#f1c40f', width: 2, dash: 'dot' },
-                            hovertemplate: '%{y} cals/1k<extra></extra>'
-                        };
+                            Plotly.newPlot('trendChart', [traceSteps, traceBatt, traceBattGain, traceRHR, traceStress, traceHRV], layout1, { responsive: true, displayModeBar: false });
 
-                        const traceActiveCals = {
-                            x: data.dates,
-                            y: data.active_cals,
-                            name: 'Active Calories',
-                            type: 'bar',
-                            marker: {
-                                color: 'rgba(243, 156, 18, 0.3)',
-                                line: { color: 'rgba(243, 156, 18, 0.8)', width: 1.5 }
-                            },
-                            hovertemplate: '%{y} kcal<extra></extra>'
-                        };
-                        
-                        // Use copies for second chart to avoid interference if Plotly mutates them
-                        const traceRHR2 = { ...traceRHR };
-                        const traceStress2 = { ...traceStress };
+                            // CHART 2: Metabolic Health
+                            const traceCost = {
+                                x: data.dates,
+                                y: data.cost,
+                                name: 'Physio Cost',
+                                type: 'scatter',
+                                mode: 'lines+markers',
+                                line: { color: '#f1c40f', width: 2, dash: 'dot' },
+                                hovertemplate: '%{y} cals/1k<extra></extra>'
+                            };
 
-                        const layout2 = {
-                            title: { text: '', font: { color: '#2c3e50' } },
-                            paper_bgcolor: 'rgba(0,0,0,0)',
-                            plot_bgcolor: 'rgba(0,0,0,0)',
-                            showlegend: true,
-                            legend: { x: 0, y: 1.15, orientation: 'h', font: { color: '#7f8c8d' } },
-                            margin: { l: 50, r: 50, t: 40, b: 40 },
-                            xaxis: { color: '#7f8c8d', showgrid: false },
-                            yaxis: { 
-                                title: 'Cost / Calories', 
-                                color: '#f1c40f',
-                                showgrid: true,
-                                gridcolor: 'rgba(0,0,0,0.05)' 
-                            },
-                            yaxis2: {
-                                title: 'RHR / Stress',
-                                overlaying: 'y',
-                                side: 'right',
-                                color: '#2c3e50',
-                                showgrid: false
-                            }
-                        };
+                            const traceActiveCals = {
+                                x: data.dates,
+                                y: data.active_cals,
+                                name: 'Active Calories',
+                                type: 'bar',
+                                marker: {
+                                    color: 'rgba(243, 156, 18, 0.3)',
+                                    line: { color: 'rgba(243, 156, 18, 0.8)', width: 1.5 }
+                                },
+                                hovertemplate: '%{y} kcal<extra></extra>'
+                            };
 
-                        Plotly.newPlot('biometricsChart', [traceActiveCals, traceCost, traceRHR2, traceStress2], layout2, { responsive: true, displayModeBar: false });
-                    });
+                            // Use copies for second chart to avoid interference if Plotly mutates them
+                            const traceRHR2 = { ...traceRHR };
+                            const traceStress2 = { ...traceStress };
 
-                // Fetch Recovery History
-                fetch('/api/recovery_history?days=365')
-                    .then(response => response.json())
-                    .then(data => {
-                        const traceRecovery = {
-                            x: data.dates,
-                            y: data.recovery_score,
-                            name: 'Recovery Score',
-                            type: 'scatter',
-                            mode: 'lines+markers',
-                            line: { color: '#2c3e50', width: 4 },
-                            marker: { size: 10, color: '#2c3e50', line: { color: '#fff', width: 2 } }
-                        };
+                            const layout2 = {
+                                title: { text: '', font: { color: '#2c3e50' } },
+                                paper_bgcolor: 'rgba(0,0,0,0)',
+                                plot_bgcolor: 'rgba(0,0,0,0)',
+                                showlegend: true,
+                                legend: { x: 0, y: 1.15, orientation: 'h', font: { color: '#7f8c8d' } },
+                                margin: { l: 50, r: 50, t: 40, b: 40 },
+                                xaxis: { color: '#7f8c8d', showgrid: false },
+                                yaxis: {
+                                    title: 'Cost / Calories',
+                                    color: '#f1c40f',
+                                    showgrid: true,
+                                    gridcolor: 'rgba(0,0,0,0.05)'
+                                },
+                                yaxis2: {
+                                    title: 'RHR / Stress',
+                                    overlaying: 'y',
+                                    side: 'right',
+                                    color: '#2c3e50',
+                                    showgrid: false
+                                }
+                            };
 
-                        const traceRHRScore = {
-                            x: data.dates,
-                            y: data.rhr_score,
-                            name: 'RHR Score',
-                            type: 'scatter',
-                            mode: 'lines',
-                            line: { color: '#e74c3c', width: 2, dash: 'dot' },
-                            visible: true
-                        };
+                            Plotly.newPlot('biometricsChart', [traceActiveCals, traceCost, traceRHR2, traceStress2], layout2, { responsive: true, displayModeBar: false });
+                        });
 
-                        const traceHRVScore = {
-                            x: data.dates,
-                            y: data.hrv_score,
-                            name: 'HRV Score',
-                            type: 'scatter',
-                            mode: 'lines',
-                            line: { color: '#f1c40f', width: 2, dash: 'dot' },
-                            visible: true
-                        };
+                    // Fetch Recovery History
+                    fetch('/api/recovery_history?days=365')
+                        .then(response => response.json())
+                        .then(data => {
+                            const traceRecovery = {
+                                x: data.dates,
+                                y: data.recovery_score,
+                                name: 'Recovery Score',
+                                type: 'scatter',
+                                mode: 'lines+markers',
+                                line: { color: '#2c3e50', width: 4 },
+                                marker: { size: 10, color: '#2c3e50', line: { color: '#fff', width: 2 } }
+                            };
 
-                        const traceStressScore = {
-                            x: data.dates,
-                            y: data.stress_score,
-                            name: 'Stress Score',
-                            type: 'scatter',
-                            mode: 'lines',
-                            line: { color: '#9b59b6', width: 2, dash: 'dot' },
-                            visible: true
-                        };
+                            const traceRHRScore = {
+                                x: data.dates,
+                                y: data.rhr_score,
+                                name: 'RHR Score',
+                                type: 'scatter',
+                                mode: 'lines',
+                                line: { color: '#e74c3c', width: 2, dash: 'dot' },
+                                visible: true
+                            };
 
-                        const layoutRec = {
-                            title: { text: '', font: { color: '#2c3e50' } },
-                            paper_bgcolor: 'rgba(0,0,0,0)',
-                            plot_bgcolor: 'rgba(0,0,0,0)',
-                            showlegend: true,
-                            legend: { x: 0, y: 1.15, orientation: 'h', font: { color: '#7f8c8d' } },
-                            xaxis: {
-                                color: '#7f8c8d',
-                                showgrid: false,
-                                tickfont: { size: 11 }
-                            },
-                            yaxis: {
-                                title: 'Score (%)',
-                                color: '#7f8c8d',
-                                showgrid: true,
-                                gridcolor: 'rgba(0, 0, 0, 0.05)',
-                                zeroline: false,
-                                range: [0, 105]
-                            },
-                            margin: { l: 50, r: 50, t: 40, b: 40 },
-                            hovermode: 'x unified',
-                            hoverlabel: { bgcolor: "#fff", bordercolor: "#eee", font: { color: "#333" } }
-                        };
+                            const traceHRVScore = {
+                                x: data.dates,
+                                y: data.hrv_score,
+                                name: 'HRV Score',
+                                type: 'scatter',
+                                mode: 'lines',
+                                line: { color: '#f1c40f', width: 2, dash: 'dot' },
+                                visible: true
+                            };
 
-                        Plotly.newPlot('recoveryChart', [traceRecovery, traceRHRScore, traceHRVScore, traceStressScore], layoutRec, { responsive: true, displayModeBar: false });
-                    });
-            });
-</script>
+                            const traceStressScore = {
+                                x: data.dates,
+                                y: data.stress_score,
+                                name: 'Stress Score',
+                                type: 'scatter',
+                                mode: 'lines',
+                                line: { color: '#9b59b6', width: 2, dash: 'dot' },
+                                visible: true
+                            };
+
+                            const layoutRec = {
+                                title: { text: '', font: { color: '#2c3e50' } },
+                                paper_bgcolor: 'rgba(0,0,0,0)',
+                                plot_bgcolor: 'rgba(0,0,0,0)',
+                                showlegend: true,
+                                legend: { x: 0, y: 1.15, orientation: 'h', font: { color: '#7f8c8d' } },
+                                xaxis: {
+                                    color: '#7f8c8d',
+                                    showgrid: false,
+                                    tickfont: { size: 11 }
+                                },
+                                yaxis: {
+                                    title: 'Score (%)',
+                                    color: '#7f8c8d',
+                                    showgrid: true,
+                                    gridcolor: 'rgba(0, 0, 0, 0.05)',
+                                    zeroline: false,
+                                    range: [0, 105]
+                                },
+                                margin: { l: 50, r: 50, t: 40, b: 40 },
+                                hovermode: 'x unified',
+                                hoverlabel: { bgcolor: "#fff", bordercolor: "#eee", font: { color: "#333" } }
+                            };
+
+                            Plotly.newPlot('recoveryChart', [traceRecovery, traceRHRScore, traceHRVScore, traceStressScore], layoutRec, { responsive: true, displayModeBar: false });
+                        });
+                });
+            </script>
 
 </body>
 
