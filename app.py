@@ -505,14 +505,20 @@ def calculate_metrics(target_date, conn, conn_activities):
     The Core Logic Engine (FINAL VERSION).
     Combines:
     1. Freeze Protocol (Low RHR).
-    2. Lag 2 Protocol (Delayed PEM).
-    3. Zombie Protocol (Downgraded to Caution).
+    2. Sensory Load Flag (High Stress / Low Steps).
+    3. Crash Predictor (T-2 Risk Score).
+    4. Mitochondrial Efficiency (Recharge Ratio).
+    5. Zombie Protocol (Downgraded to Caution).
     """
     cursor = conn.cursor()
     
     # 1. Fetch Key Metrics
     cursor.execute("SELECT rhr, hr_max, bb_charged, stress_avg, steps, calories_active FROM daily_summary WHERE day = ?", (target_date,))
     row = cursor.fetchone()
+    
+    # Fetch Sleep Data for Mitochondrial Efficiency
+    cursor.execute("SELECT total_sleep FROM sleep WHERE day = ?", (target_date,))
+    row_sleep = cursor.fetchone()
     
     if not row:
         return {"status": "GRAY", "reason": "No Data", "target_steps": 0, "metrics": {}}
@@ -521,42 +527,92 @@ def calculate_metrics(target_date, conn, conn_activities):
     bb_charged = row['bb_charged']
     active_cals = row['calories_active']
     steps = row['steps']
+    stress_avg = row['stress_avg']
+    
+    # Parse total_sleep to hours
+    sleep_hours = 0
+    if row_sleep and row_sleep['total_sleep']:
+        sleep_hours = parse_time_str(row_sleep['total_sleep']) / 60 # parse_time_str returns minutes
     
     # --- GOLDEN ERA BASELINES (Mar-May 2025) ---
     BASELINE_RHR = 50.6
     BASELINE_COST = 29.0 # Active Calories per 1,000 Steps
+    BASELINE_STEPS = 4000
+    BASELINE_STRESS = 35
     
     warnings = []
     red_flags = []
     
-    # --- LOGIC GATE 1: THE ENGINE (RHR) ---
+    # --- LOGIC GATE 1: THE ENGINE (RHR & Sensory Load) ---
     # Sympathetic Stress (Too High)
     if rhr and rhr > (BASELINE_RHR + 3):  # > 53.6 bpm
         red_flags.append(f"High RHR (+{round(rhr - BASELINE_RHR, 1)})")
         
-    # Parasympathetic Freeze (Too Low) - THE NEW CRITICAL CHECK
+    # Parasympathetic Freeze (Too Low)
     elif rhr and rhr < (BASELINE_RHR - 2.5): # < 48.1 bpm
         red_flags.append(f"Metabolic Freeze Detected (RHR {rhr})")
-
-    # --- LOGIC GATE 2: THE BATTERY ---
+        
+    # SENSORY LOAD FLAG (New)
+    # IF Steps < 3000 AND Average_Stress > 35
+    if steps is not None and steps < 3000 and stress_avg and stress_avg > 35:
+        red_flags.append("High Idle / Sensory Overload")
+        
+    # --- LOGIC GATE 2: THE BATTERY (Mitochondrial Efficiency) ---
     if bb_charged and bb_charged < 50:
         red_flags.append(f"Poor Recharge (Max {bb_charged}%)")
-
-    # --- LOGIC GATE 3: THE LAG 2 PREDICTOR (Restored) ---
-    # Check T-2 (Two days ago) for overload
+        
+    # Mitochondrial Efficiency Check (New)
+    # Recharge_Ratio = Body_Battery_Gain / Sleep_Hours
+    if sleep_hours > 0 and bb_charged:
+        recharge_ratio = bb_charged / sleep_hours
+        if recharge_ratio < 5.0:
+            warnings.append(f"Unrefreshing Sleep (Ratio {round(recharge_ratio, 1)} < 5.0)")
+            
+    # --- LOGIC GATE 3: THE LAG 2 PREDICTOR (Risk Formula) ---
+    # Risk = (Steps_48h / Baseline_Steps) + (Stress_48h / Baseline_Stress)
+    # Threshold > 1.5
+    # OR Sensory Overload: Stress > 35 AND Steps < 1000
     day_t2 = (datetime.strptime(target_date, '%Y-%m-%d') - timedelta(days=2)).strftime('%Y-%m-%d')
-    cursor.execute("SELECT steps, hr_max FROM daily_summary WHERE day = ?", (day_t2,))
+    cursor.execute("SELECT steps, hr_max, stress_avg FROM daily_summary WHERE day = ?", (day_t2,))
     row_t2 = cursor.fetchone()
     
     if row_t2:
-        # If she exceeded 5000 steps 48 hours ago, today is the Crash Day.
-        if row_t2['steps'] and row_t2['steps'] > 5000:
-            red_flags.append(f"Lag 2 Impact (High Load on {day_t2})")
-        # Optional: HR Spike T-2 check
+        val_steps_t2 = row_t2['steps'] if row_t2['steps'] else 0
+        val_stress_t2 = row_t2['stress_avg'] if row_t2['stress_avg'] else 0
+        
+        # Calculate Risk Score (Keep for general mixed load)
+        risk_score = (val_steps_t2 / BASELINE_STEPS) + (val_stress_t2 / BASELINE_STRESS)
+        
+        # Check 1: Sensory Overload (Specific Request)
+        if val_stress_t2 > 35 and val_steps_t2 < 3000:
+            warnings.append("Lag-2 Risk: Sensory Overload Detected")
+            
+        # Check 2: High Volume (Old Rule)
+        elif val_steps_t2 > 5000:
+            warnings.append(f"Lag-2 Impact (High Load on {day_t2})")
+            
+        # Check 3: Combined Risk (New Formula Catch-all)
+        elif risk_score > 1.5:
+             warnings.append(f"Lag-2 Warning (Risk {round(risk_score, 2)})")
+
+        # Optional: HR Spike T-2 check (Preserved)
         if row_t2['hr_max'] and row_t2['hr_max'] > 110:
             warnings.append(f"Lag 2 HR Spike ({day_t2})")
 
-    # --- LOGIC GATE 4: PHYSIOLOGICAL COST (The Efficiency Check) ---
+    # --- LOGIC GATE 4: SAFETY CEILING (T-1 Load) ---
+    # Updated to include T-1 Sensory Crash check
+    day_t1 = (datetime.strptime(target_date, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
+    cursor.execute("SELECT steps, stress_avg FROM daily_summary WHERE day = ?", (day_t1,))
+    row_t1 = cursor.fetchone()
+    
+    if row_t1:
+        val_steps_t1 = row_t1['steps'] if row_t1['steps'] else 0
+        val_stress_t1 = row_t1['stress_avg'] if row_t1['stress_avg'] else 0
+        
+        if val_stress_t1 > 35 and val_steps_t1 < 3000:
+             warnings.append(f"T-1 High Idle / Sensory Overload ({day_t1})")
+
+    # --- LOGIC GATE 5: PHYSIOLOGICAL COST (The Efficiency Check) ---
     # Metric: Active Calories per 1,000 steps
     # Baseline: ~29.0. Warning Threshold: +20% (34.8)
     physio_cost = 0
@@ -566,7 +622,7 @@ def calculate_metrics(target_date, conn, conn_activities):
         if physio_cost > (BASELINE_COST * 1.2):
             warnings.append(f"High Physiological Cost ({int(physio_cost)})")
 
-    # --- LOGIC GATE 5: MOVEMENT INEFFICIENCY (The Zombie Walk) ---
+    # --- LOGIC GATE 6: MOVEMENT INEFFICIENCY (The Zombie Walk) ---
     # Downgraded to YELLOW (Caution)
     cursor_act = conn_activities.cursor()
     yesterday = (datetime.strptime(target_date, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
@@ -591,7 +647,11 @@ def calculate_metrics(target_date, conn, conn_activities):
     # --- FINAL VERDICT ---
     if len(red_flags) > 0:
         status = "RED"
-        reason = "STOP. " + ", ".join(red_flags)
+        # Special check for Sensory Load text
+        if "High Idle / Sensory Overload" in red_flags:
+             reason = "System is idling high. Physical rest is not enough; requires sensory deprivation."
+        else:
+             reason = "STOP. " + ", ".join(red_flags)
         target_steps = 1500
     elif len(warnings) >= 1:
         status = "YELLOW"
@@ -649,16 +709,22 @@ def index():
     # 2. Map Core Logic to UI Panels (The "Adapter" Layer)
     
     # A. Crash Predictor (Lag 2)
-    # Check if "Lag 2" is mentioned in the Stop Reason
-    if "Lag 2" in metrics_raw['reason']:
+    # Check for the specific "Sensory" phrase in the final output
+    if "sensory deprivation" in metrics_raw['reason'] or "Sensory Overload" in metrics_raw['reason']:
+        crash_status = {"status": "RED", "msg": "Lag-2 Risk: Sensory Overload"}
+    elif "Lag 2" in metrics_raw['reason']:
         crash_status = {"status": "RED", "msg": "High Load 48h ago (>5k steps)"}
     else:
         crash_status = {"status": "GREEN", "msg": "No Lag-2 Risk Detected"}
 
     # B. Safety Ceiling (T-1 Load)
-    # We infer this: if today is RED but NOT because of Lag 2/RHR/Batt, it might be T-1 load.
-    # For now, default to Green unless explicitly flagged.
-    safety_status = {"status": "GREEN", "msg": "Within Volume Limits"}
+    # Check for the "System is idling high" phrase
+    if "System is idling high" in metrics_raw['reason'] or "T-1 High Idle" in metrics_raw['reason']:
+        safety_status = {"status": "YELLOW", "msg": "T-1 Sensory Overload"}
+    elif "Volume Ceiling" in metrics_raw['reason']:
+        safety_status = {"status": "RED", "msg": "Volume Ceiling Breached"}
+    else:
+        safety_status = {"status": "GREEN", "msg": "Within Volume Limits"}
 
     # C. Autonomic Stress (The Engine)
     # Check RHR flags
