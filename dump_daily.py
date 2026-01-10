@@ -209,55 +209,63 @@ def get_smart_summary_for_date(db_dir, date_str):
     
     return data
 
+def generate_smart_summary_text(dates, db_dir):
+    """
+    Generates the human-readable report as a string.
+    """
+    lines = []
+    for date_str in dates:
+        summary = get_smart_summary_for_date(db_dir, date_str)
+        
+        # Header
+        try:
+            dt_obj = datetime.strptime(date_str, '%Y-%m-%d')
+            day_name = dt_obj.strftime('%A')
+        except:
+            day_name = "Unknown"
+            
+        lines.append(f"DATE: {date_str} ({day_name})")
+        lines.append("-" * 40)
+        
+        # Section 1: METRICS
+        lines.append("METRICS:")
+        if summary['metrics']:
+            # Filter None values
+            clean_metrics = {k: v for k, v in summary['metrics'].items() if v is not None}
+            if clean_metrics:
+                pairs = [f"{k}={v}" for k, v in clean_metrics.items()]
+                # Wrap every 3 items for readability
+                chunk_size = 3
+                for i in range(0, len(pairs), chunk_size):
+                    lines.append("  " + ", ".join(pairs[i:i+chunk_size]))
+            else:
+                lines.append("  (No data)")
+        else:
+            lines.append("  (No data)")
+        lines.append("")
+        
+        # Section 2: ACTIVITIES
+        lines.append("ACTIVITIES:")
+        if summary['activities']:
+            for act in summary['activities']:
+                # Format: Name (Type): Duration | HR: X | Y cal
+                cal_str = f" | {act['calories']} cal" if act.get('calories') else ""
+                hr_str = f" | HR: {act['avg_hr']}" if act.get('avg_hr') else ""
+                lines.append(f"  - {act['name']} ({act['type']}): {act['duration']}{hr_str}{cal_str}")
+        else:
+            lines.append("  (None)")
+        
+        lines.append("\n" + "="*40 + "\n")
+        
+    return "\n".join(lines)
+
 def write_smart_summary(dates, db_dir, output_file):
     """
     Writes the human-readable report.
     """
+    text_content = generate_smart_summary_text(dates, db_dir)
     with open(output_file, 'w') as f:
-        for date_str in dates:
-            summary = get_smart_summary_for_date(db_dir, date_str)
-            
-            # Header
-            try:
-                dt_obj = datetime.strptime(date_str, '%Y-%m-%d')
-                day_name = dt_obj.strftime('%A')
-            except:
-                day_name = "Unknown"
-                
-            f.write(f"DATE: {date_str} ({day_name})\n")
-            f.write("-" * 40 + "\n")
-            
-            # Section 1: METRICS
-            f.write("METRICS:\n")
-            if summary['metrics']:
-                # Filter None values
-                clean_metrics = {k: v for k, v in summary['metrics'].items() if v is not None}
-                if clean_metrics:
-                    # Print in a nice block? Or list? User asked for "Single line or tight block"
-                    # Let's do a tight block of key=value
-                    pairs = [f"{k}={v}" for k, v in clean_metrics.items()]
-                    # Wrap every 3 items for readability
-                    chunk_size = 3
-                    for i in range(0, len(pairs), chunk_size):
-                        f.write("  " + ", ".join(pairs[i:i+chunk_size]) + "\n")
-                else:
-                    f.write("  (No data)\n")
-            else:
-                f.write("  (No data)\n")
-            f.write("\n")
-            
-            # Section 2: ACTIVITIES
-            f.write("ACTIVITIES:\n")
-            if summary['activities']:
-                for act in summary['activities']:
-                    # Format: Name (Type): Duration | HR: X | Y cal
-                    cal_str = f" | {act['calories']} cal" if act.get('calories') else ""
-                    hr_str = f" | HR: {act['avg_hr']}" if act.get('avg_hr') else ""
-                    f.write(f"  - {act['name']} ({act['type']}): {act['duration']}{hr_str}{cal_str}\n")
-            else:
-                f.write("  (None)\n")
-            
-            f.write("\n" + "="*40 + "\n\n")
+        f.write(text_content)
 
 def main():
     parser = argparse.ArgumentParser(description="Dump health data.")

@@ -2,7 +2,8 @@ import sqlite3
 import os
 import subprocess
 from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, make_response
+import dump_daily
 
 app = Flask(__name__)
 
@@ -669,18 +670,16 @@ def calculate_metrics(target_date, conn, conn_activities):
         "metrics": {"rhr": rhr, "bb": bb_charged, "physio_cost": physio_cost, "steps": steps}
     }
 
-@app.route('/')
-def index():
-    is_fresh, last_data, last_hrv, last_sleep, is_sleep_today = check_freshness()
-    
-    # Parse date param for Historical View
-    date_str = request.args.get('date')
+def get_dashboard_context(date_str):
+    """
+    Encapsulates all the logic to fetch and process data for the dashboard.
+    Returns a dict with: metrics, recovery, trends, flags, etc.
+    """
+    # Parse date
     selected_date = None
     if date_str:
         try:
             selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-            # If viewing past, is_fresh is less relevant? Or maybe we can say "Data for [Date]"
-            # But let's keep is_fresh logic as "Is GLOBAL data fresh"
         except ValueError:
             selected_date = None
 
@@ -696,7 +695,7 @@ def index():
         conn.close()
         conn_activities.close()
     except Exception as e:
-        print(f"Error calculating metrics in index: {e}")
+        print(f"Error calculating metrics for {target_date_str}: {e}")
         metrics_raw = {"status": "GRAY", "reason": f"Error: {e}", "target_steps": 0, "metrics": {}}
         trends = {
             "rhr": {"trend_7d": 0, "trend_3d": 0, "val": 0},
@@ -709,7 +708,6 @@ def index():
     # 2. Map Core Logic to UI Panels (The "Adapter" Layer)
     
     # A. Crash Predictor (Lag 2)
-    # Check for the specific "Sensory" phrase in the final output
     if "sensory deprivation" in metrics_raw['reason'] or "Sensory Overload" in metrics_raw['reason']:
         crash_status = {"status": "RED", "msg": "Lag-2 Risk: Sensory Overload"}
     elif "Lag 2" in metrics_raw['reason']:
@@ -718,7 +716,6 @@ def index():
         crash_status = {"status": "GREEN", "msg": "No Lag-2 Risk Detected"}
 
     # B. Safety Ceiling (T-1 Load)
-    # Check for the "System is idling high" phrase
     if "System is idling high" in metrics_raw['reason'] or "T-1 High Idle" in metrics_raw['reason']:
         safety_status = {"status": "YELLOW", "msg": "T-1 Sensory Overload"}
     elif "Volume Ceiling" in metrics_raw['reason']:
@@ -727,7 +724,6 @@ def index():
         safety_status = {"status": "GREEN", "msg": "Within Volume Limits"}
 
     # C. Autonomic Stress (The Engine)
-    # Check RHR flags
     if "High RHR" in metrics_raw['reason']:
         stress_status = {"status": "RED", "msg": "Sympathetic Stress (High RHR)"}
     elif "Freeze" in metrics_raw['reason']:
@@ -737,7 +733,7 @@ def index():
 
     # D. Sleep Recharge (The Battery)
     if "Poor Recharge" in metrics_raw['reason']:
-        sleep_status = {"status": "RED", "msg": f"Battery Gain {metrics_raw['metrics']['bb']}% < 50%"}
+        sleep_status = {"status": "RED", "msg": f"Battery Gain {metrics_raw['metrics'].get('bb', 0)}% < 50%"}
     else:
         sleep_status = {"status": "GREEN", "msg": "Recharge Sufficient"}
         
@@ -754,7 +750,7 @@ def index():
     else:
          p_cost_status = {"status": "GREEN", "msg": "Efficiency Normal"}
 
-    # 3. Build Final Dictionary for HTML
+    # 3. Build Final Dictionary
     metrics = {
         "final_verdict": {
             "status": metrics_raw["status"],
@@ -769,10 +765,12 @@ def index():
         "physio_cost": {
             "status": p_cost_status["status"],
             "msg": p_cost_status["msg"],
-            "val": round(p_cost, 1)
+            "val": round(p_cost, 1) if p_cost else 0
         },
-        "respiration_warning": {"status": "GRAY", "msg": "Monitor via Oura/Manual"}, # Keep Gray for now
-        "today_data_available": True if metrics_raw['metrics'].get('rhr') else False
+        "respiration_warning": {"status": "GRAY", "msg": "Monitor via Oura/Manual"},
+        "today_data_available": True if metrics_raw['metrics'].get('rhr') else False,
+        # Keep raw metrics access if needed
+        "_raw": metrics_raw['metrics']
     }
 
     daily_status = metrics['final_verdict']['status']
@@ -787,14 +785,189 @@ def index():
         print(f"Error calculating recovery score: {e}")
 
     # 5. Logic Flags
-    current_steps = metrics_raw['metrics'].get('steps', 0)
-    current_cost = metrics_raw['metrics'].get('physio_cost', 0)
+    current_steps = metrics_raw['metrics'].get('steps', 0) or 0
+    current_cost = metrics_raw['metrics'].get('physio_cost', 0) or 0
     
     flags = {
         "INEFFICIENT_RECOVERY": (current_steps < 2500 and current_cost > 35)
     }
+    
+    # 6. Chart Data
+    chart_data = get_time_series_data(target_date_obj)
+    recovery_history = get_recovery_history_data(365)
+    
+    return {
+        "metrics": metrics,
+        "recovery": recovery_score,
+        "trends": trends,
+        "flags": flags,
+        "target_date_str": target_date_str,
+        "chart_data": chart_data,
+        "recovery_history": recovery_history
+    }
+
+def dict_to_csv(data_dict):
+    """
+    Helper to convert a dict of lists into a CSV string.
+     Assumes all lists are same length.
+    """
+    if not data_dict:
+        return ""
         
-    return render_template('index.html', fresh=is_fresh, last_data=last_data, last_hrv=last_hrv, last_sleep=last_sleep, metrics=metrics, recovery=recovery_score, trends=trends, flags=flags, selected_date=target_date_str, db_dir=DB_DIR)
+    keys = list(data_dict.keys())
+    # Find length of first list
+    if not keys:
+        return ""
+        
+    num_rows = len(data_dict[keys[0]])
+    
+    lines = []
+    # Header
+    lines.append(",".join(keys))
+    
+    # Rows
+    for i in range(num_rows):
+        row = []
+        for k in keys:
+            val = data_dict[k][i]
+            if val is None:
+                row.append("")
+            else:
+                row.append(str(val))
+        lines.append(",".join(row))
+        
+    return "\n".join(lines)
+
+def format_dashboard_report(context):
+    """
+    Formats the dashboard context into a detailed text string.
+    """
+    m = context['metrics']
+    r = context['recovery']
+    t = context['trends']
+    date_str = context['target_date_str']
+    
+    lines = []
+    lines.append(f"TREE HEALTH DASHBOARD REPORT")
+    lines.append(f"Date: {date_str}")
+    lines.append("=" * 40)
+    lines.append("")
+    
+    # 1. DAILY VERDICT
+    v = m['final_verdict']
+    lines.append(f"[ {v['status']} ] {v['msg']}")
+    lines.append(f"Target: {v['target']}")
+    lines.append("-" * 40)
+    lines.append("")
+
+    # 2. RECOVERY INDEX
+    lines.append("RECOVERY INDEX")
+    if r:
+        lines.append(f"Score: {r['score']}%")
+        lines.append(f"  RHR:    {r['details']['rhr']['val']} bpm (Score: {r['details']['rhr']['score']}%)")
+        lines.append(f"  HRV:    {r['details']['hrv']['val']} ms  (Score: {r['details']['hrv']['score']}%)")
+        lines.append(f"  Stress: {r['details']['stress']['adj']}     (Score: {r['details']['stress']['score']}%)")
+        if r['veto_msg']:
+            lines.append(f"  * {r['veto_msg']}")
+    else:
+        lines.append("  (No Data)")
+    lines.append("")
+
+    # 3. PHYSIOLOGICAL STATUS
+    lines.append("PHYSIOLOGICAL STATUS")
+    
+    def status_line(label, obj):
+        return f"  {label:<20} [{obj['status']}] {obj['msg']}"
+        
+    lines.append(status_line("Crash Predictor", m['crash_predictor']))
+    lines.append(status_line("Safety Ceiling", m['safety_ceiling']))
+    lines.append(status_line("Autonomic Stress", m['autonomic_stress']))
+    lines.append(status_line("Sleep Recharge", m['sleep_recharge']))
+    lines.append(status_line("Efficiency Check", m['efficiency_check']))
+    lines.append(f"  Physio Cost          [{m['physio_cost']['status']}] {m['physio_cost']['val']} Cals/1k ({m['physio_cost']['msg']})")
+    lines.append("")
+
+    # 4. TREND COMMAND CENTER
+    lines.append("TREND COMMAND CENTER")
+    
+    def trend_line(label, obj, unit):
+        t7 = f"{obj['trend_7d']:+}"
+        t3 = f"{obj['trend_3d']:+}"
+        return f"  {label:<12} {obj['val']:>5}{unit} | 7d: {t7:>5} | 3d: {t3:>5}"
+        
+    lines.append(trend_line("Body Batt", t['batt'], "%"))
+    lines.append(trend_line("HRV (Avg)", t['hrv'], "ms"))
+    lines.append(trend_line("Resting HR", t['rhr'], "bp"))
+    lines.append(trend_line("Stress", t['stress'], "  "))
+    lines.append("")
+    
+    lines.append("Efficiency Report (Last 3 Days):")
+    for cost in t['recent_costs']:
+        lines.append(f"  {cost['label']}: {cost['cost']} ({cost['status']})")
+        
+    lines.append("")
+    lines.append("=" * 40)
+    lines.append("")
+    
+    # 5. CHART DATA (CSV BLOCKS)
+    lines.append("DATA: Activity & Capacity (14-Day Rolling)")
+    lines.append("-" * 40)
+    lines.append(dict_to_csv(context['chart_data']))
+    lines.append("")
+    lines.append("=" * 40)
+    lines.append("")
+    
+    # 6. RECOVERY HISTORY (CSV BLOCK)
+    lines.append("DATA: Recovery History (365-Day)")
+    lines.append("-" * 40)
+    lines.append(dict_to_csv(context['recovery_history']))
+    lines.append("")
+    lines.append("End of Report")
+    
+    return "\n".join(lines)
+
+@app.route('/')
+def index():
+    is_fresh, last_data, last_hrv, last_sleep, is_sleep_today = check_freshness()
+    
+    # Parse date param
+    date_str = request.args.get('date')
+    
+    # Get Dashboard Context
+    ctx = get_dashboard_context(date_str)
+    
+    return render_template('index.html', 
+                           fresh=is_fresh, 
+                           last_data=last_data, 
+                           last_hrv=last_hrv, 
+                           last_sleep=last_sleep, 
+                           metrics=ctx['metrics'], 
+                           recovery=ctx['recovery'], 
+                           trends=ctx['trends'], 
+                           flags=ctx['flags'], 
+                           selected_date=ctx['target_date_str'], 
+                           db_dir=DB_DIR)
+
+@app.route('/download_summary')
+def download_summary():
+    date_str = request.args.get('date')
+    if not date_str:
+        date_str = datetime.now().strftime('%Y-%m-%d')
+        
+    try:
+        # Get context
+        ctx = get_dashboard_context(date_str)
+        # Generate text
+        text_content = format_dashboard_report(ctx)
+        
+        response = make_response(text_content)
+        response.headers["Content-Disposition"] = f"attachment; filename=dashboard_report_{date_str}.txt"
+        response.mimetype = 'text/plain'
+        return response
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return f"Error generating summary: {e}", 500
 
 @app.route('/sync', methods=['POST'])
 def sync():
@@ -837,24 +1010,12 @@ def sync():
         return jsonify({"status": "error", "message": f"An error occurred: {e}"}), 500
 
 
-@app.route('/api/data')
-def api_data():
+def get_time_series_data(target_date):
     """
-    Return JSON data for Plotly charts (14-day rolling view).
+    Fetch 14-day rolling data for charts.
+    Returns a dict with lists for each metric.
     """
-    # 14 days including today? Or 14 days ending yesterday? 
-    # Usually "14-Day Rolling View" includes the latest available data.
-    
-    # Parse date param
-    date_str = request.args.get('date')
-    if date_str:
-        try:
-            end_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-        except ValueError:
-             end_date = datetime.now().date()
-    else:
-        end_date = datetime.now().date()
-        
+    end_date = target_date if target_date else datetime.now().date()
     start_date = end_date - timedelta(days=13)
     
     data = {
@@ -873,13 +1034,6 @@ def api_data():
         conn = get_db_connection(GARMIN_DB)
         cursor = conn.cursor()
         
-        # We need Steps, RHR, Stress from daily_summary
-        # daily_summary has 'days', 'steps', 'rhr', 'stress_avg' 
-        # Metric 3 used `resting_hr` table. Let's stick to `resting_hr` table for consistency if possible, 
-        # but `daily_summary` might be easier to join if we want everything in one go.
-        # Let's query them separately to be safe or join them.
-        
-        # Let's just loop through dates to ensure we have continuous X-axis even if data is missing.
         current = start_date
         while current <= end_date:
             date_str = current.isoformat()
@@ -888,16 +1042,14 @@ def api_data():
             # Steps
             cursor.execute("SELECT steps FROM daily_summary WHERE day = ?", (date_str,))
             row_steps = cursor.fetchone()
-            steps = row_steps['steps'] if row_steps else 0 # 0 or None? 0 is better for bar chart gaps?
+            steps = row_steps['steps'] if row_steps else 0
             data["steps"].append(steps if steps else 0)
             
             # RHR
-            # Try resting_hr table first
             cursor.execute("SELECT resting_heart_rate FROM resting_hr WHERE day = ?", (date_str,))
             row_rhr = cursor.fetchone()
             rhr = row_rhr['resting_heart_rate'] if row_rhr else None
             
-            # Fallback to daily_summary.rhr if resting_hr is missing?
             if rhr is None:
                 cursor.execute("SELECT rhr FROM daily_summary WHERE day = ?", (date_str,))
                 row_ds_rhr = cursor.fetchone()
@@ -912,7 +1064,7 @@ def api_data():
             stress = row_stress['stress_avg'] if row_stress else None
             data["stress"].append(stress)
             
-            # Body Battery (bb_max)
+            # Body Battery
             cursor.execute("SELECT bb_max, bb_charged FROM daily_summary WHERE day = ?", (date_str,))
             row_bb = cursor.fetchone()
             batt = row_bb['bb_max'] if row_bb else None
@@ -921,7 +1073,6 @@ def api_data():
             data["batt_gain"].append(batt_gain)
 
             # Physiological Cost
-            # Need active calories
             cursor.execute("SELECT calories_active FROM daily_summary WHERE day = ?", (date_str,))
             row_cals = cursor.fetchone()
             active_cals = row_cals['calories_active'] if row_cals else 0
@@ -942,23 +1093,14 @@ def api_data():
             
         conn.close()
     except Exception as e:
-        print(f"Error fetching API data: {e}")
+        print(f"Error fetching time series data: {e}")
         
-    return jsonify(data)
+    return data
 
-@app.route('/api/recovery_history')
-def api_recovery_history():
+def get_recovery_history_data(days=14):
     """
-    Return JSON data for Recovery Score history.
-    Includes Veto status handling.
-    Query Params:
-        days: (optional) Number of days to look back. Default 14.
+    Fetch historical recovery scores.
     """
-    try:
-        days = int(request.args.get('days', 14))
-    except ValueError:
-        days = 14
-        
     end_date = datetime.now().date()
     start_date = end_date - timedelta(days=days - 1)
     
@@ -979,19 +1121,16 @@ def api_recovery_history():
             date_str = current.isoformat()
             data["dates"].append(date_str)
             
-            # 1. Get Daily Status (for Veto)
+            # 1. Get Daily Status
             try:
-                # Reuse connections for performance
-                # Pass as STRING '%Y-%m-%d'
                 try:
                     metrics = calculate_metrics(date_str, conn, conn_activities)
                     daily_status = metrics['status']
                 except Exception as inner_e:
-                    print(f"Warning: calculate_metrics failed for {date_str}: {inner_e}")
-                    daily_status = "GREEN" # Fallback
-            except Exception as e:
-                print(f"Error calculating metrics for {date_str}: {e}")
-                daily_status = "GREEN" # Fallback
+                    # print(f"Warning: calculate_metrics failed for {date_str}: {inner_e}")
+                    daily_status = "GREEN" 
+            except Exception:
+                daily_status = "GREEN"
 
             # 2. Get Recovery Score
             try:
@@ -1000,8 +1139,7 @@ def api_recovery_history():
                 data["rhr_score"].append(score_data['details']['rhr']['score'])
                 data["hrv_score"].append(score_data['details']['hrv']['score'])
                 data["stress_score"].append(score_data['details']['stress']['score'])
-            except Exception as e:
-                print(f"Error calculating score for {date_str}: {e}")
+            except Exception:
                 data["recovery_score"].append(None)
                 data["rhr_score"].append(None)
                 data["hrv_score"].append(None)
@@ -1014,6 +1152,36 @@ def api_recovery_history():
     except Exception as e:
         print(f"Error fetching history data: {e}")
         
+    return data
+
+@app.route('/api/data')
+def api_data():
+    """
+    Return JSON data for Plotly charts (14-day rolling view).
+    """
+    date_str = request.args.get('date')
+    if date_str:
+        try:
+            end_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+             end_date = datetime.now().date()
+    else:
+        end_date = datetime.now().date()
+        
+    data = get_time_series_data(end_date)
+    return jsonify(data)
+
+@app.route('/api/recovery_history')
+def api_recovery_history():
+    """
+    Return JSON data for Recovery Score history.
+    """
+    try:
+        days = int(request.args.get('days', 14))
+    except ValueError:
+        days = 14
+        
+    data = get_recovery_history_data(days)
     return jsonify(data)
 
 if __name__ == '__main__':

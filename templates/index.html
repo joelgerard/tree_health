@@ -282,6 +282,14 @@
                         }
                     </script>
 
+                    <!-- Download Report -->
+                    <a href="/download_summary?date={{ selected_date }}" 
+                       class="glass-panel d-flex align-items-center justify-content-center text-dark text-decoration-none" 
+                       style="width: 42px; height: 42px;" 
+                       title="Download Daily Report">
+                        <i class="bi bi-download"></i>
+                    </a>
+
                     {% if not fresh %}
                     <button class="btn btn-primary px-4 py-2 rounded-pill d-flex align-items-center gap-2"
                         hx-post="/sync" hx-swap="none" onclick="location.reload()"
