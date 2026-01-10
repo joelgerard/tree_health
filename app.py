@@ -600,18 +600,25 @@ def calculate_metrics(target_date, conn, conn_activities):
         if row_t2['hr_max'] and row_t2['hr_max'] > 110:
             warnings.append(f"Lag 2 HR Spike ({day_t2})")
 
-    # --- LOGIC GATE 4: SAFETY CEILING (T-1 Load) ---
-    # Updated to include T-1 Sensory Crash check
+    # 3. Safety Ceiling (T-1) Logic [UPDATED]
     day_t1 = (datetime.strptime(target_date, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
-    cursor.execute("SELECT steps, stress_avg FROM daily_summary WHERE day = ?", (day_t1,))
+    cursor.execute("SELECT steps, calories_active FROM daily_summary WHERE day = ?", (day_t1,))
     row_t1 = cursor.fetchone()
     
     if row_t1:
         val_steps_t1 = row_t1['steps'] if row_t1['steps'] else 0
-        val_stress_t1 = row_t1['stress_avg'] if row_t1['stress_avg'] else 0
+        val_active_cals_t1 = row_t1['calories_active'] if row_t1['calories_active'] else 0
         
-        if val_stress_t1 > 35 and val_steps_t1 < 3000:
-             warnings.append(f"T-1 High Idle / Sensory Overload ({day_t1})")
+        # Calculate Physiological Cost
+        physio_cost_t1 = (val_active_cals_t1 / val_steps_t1 * 1000) if val_steps_t1 > 0 else 0
+        
+        VOLUME_LIMIT = 3000
+        COST_LIMIT = 150
+        
+        if val_steps_t1 > VOLUME_LIMIT:
+             red_flags.append(f"Volume Ceiling Breached ({val_steps_t1} steps)")
+        elif physio_cost_t1 > COST_LIMIT:
+             red_flags.append(f"High Metabolic Tax (Cost: {int(physio_cost_t1)})")
 
     # --- LOGIC GATE 5: PHYSIOLOGICAL COST (The Efficiency Check) ---
     # Metric: Active Calories per 1,000 steps
@@ -715,11 +722,14 @@ def get_dashboard_context(date_str):
     else:
         crash_status = {"status": "GREEN", "msg": "No Lag-2 Risk Detected"}
 
+
     # B. Safety Ceiling (T-1 Load)
     if "System is idling high" in metrics_raw['reason'] or "T-1 High Idle" in metrics_raw['reason']:
         safety_status = {"status": "YELLOW", "msg": "T-1 Sensory Overload"}
     elif "Volume Ceiling" in metrics_raw['reason']:
         safety_status = {"status": "RED", "msg": "Volume Ceiling Breached"}
+    elif "High Metabolic Tax" in metrics_raw['reason']:
+        safety_status = {"status": "RED", "msg": "High Metabolic Tax Detected"}
     else:
         safety_status = {"status": "GREEN", "msg": "Within Volume Limits"}
 
