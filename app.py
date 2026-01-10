@@ -794,7 +794,7 @@ def index():
         "INEFFICIENT_RECOVERY": (current_steps < 2500 and current_cost > 35)
     }
         
-    return render_template('index.html', fresh=is_fresh, last_data=last_data, last_hrv=last_hrv, last_sleep=last_sleep, metrics=metrics, recovery=recovery_score, trends=trends, flags=flags, selected_date=target_date_str)
+    return render_template('index.html', fresh=is_fresh, last_data=last_data, last_hrv=last_hrv, last_sleep=last_sleep, metrics=metrics, recovery=recovery_score, trends=trends, flags=flags, selected_date=target_date_str, db_dir=DB_DIR)
 
 @app.route('/sync', methods=['POST'])
 def sync():

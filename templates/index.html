@@ -641,6 +641,16 @@
                 <h5 class="text-secondary text-uppercase letter-spacing-2 mb-4">Metabolic Health (14-Day)</h5>
                 <div id="biometricsChart" style="height: 350px;"></div>
             </div>
+            <!-- Database Directory Info -->
+            <footer class="mt-5 mb-4 text-center">
+                <div class="glass-panel p-3 d-inline-block">
+                    <small class="text-secondary text-uppercase letter-spacing-2" style="font-size: 0.7rem;">Database
+                        Directory</small>
+                    <div class="text-secondary mono small mt-1" style="font-family: monospace; opacity: 0.8;">
+                        {{ db_dir }}
+                    </div>
+                </div>
+            </footer>
 
             <script>
                 document.addEventListener('DOMContentLoaded', function () {
