@@ -684,6 +684,11 @@
                 <h5 class="text-secondary text-uppercase letter-spacing-2 mb-4">Activity & Capacity (14-Day)</h5>
                 <div id="trendChart" style="height: 350px;"></div>
             </div>
+<!-- Temperature Deviation Chart -->
+<div class="glass-panel p-4 mb-4">
+    <h5 class="text-secondary text-uppercase letter-spacing-2 mb-4">Temperature Deviation (14-Day)</h5>
+    <div id="tempChart" style="height: 300px;"></div>
+</div>
             <!-- Biometrics Chart -->
             <div class="glass-panel p-4 mb-4">
                 <h5 class="text-secondary text-uppercase letter-spacing-2 mb-4">Metabolic Health (14-Day)</h5>
@@ -770,17 +775,8 @@
                                 line: { color: '#1abc9c', width: 2 }
                             };
 
-                            const traceTemp = {
-                                x: data.dates,
-                                y: data.body_temp,
-                                name: 'Body Temp (C)',
-                                yaxis: 'y2',
-                                type: 'scatter',
-                                mode: 'lines',
-                                visible: true,
-                                line: { color: '#e67e22', width: 2, dash: 'dot' },
-                                hovertemplate: '%{y:.2f}°C<extra></extra>'
-                            };
+                            // Temp Trace Removed from here
+                            const traceTemp = {};
 
                             const layout1 = {
                                 title: { text: '', font: { color: '#2c3e50' } },
@@ -800,7 +796,40 @@
                                 }
                             };
 
-                            Plotly.newPlot('trendChart', [traceSteps, traceBatt, traceBattGain, traceRHR, traceStress, traceHRV, traceTemp], layout1, { responsive: true, displayModeBar: false });
+                            Plotly.newPlot('trendChart', [traceSteps, traceBatt, traceBattGain, traceRHR, traceStress, traceHRV], layout1);
+
+                            // CHART 1B: Temperature Deviation
+                            const traceTempDev = {
+                                x: data.dates,
+                                y: data.temp_dev,
+                                name: 'Temp Deviation',
+                                type: 'bar',
+                                marker: {
+                                    color: data.temp_dev.map(v => v >= 0 ? '#e74c3c' : '#3498db')
+                                },
+                                hovertemplate: '%{y:+.2f}°C<extra></extra>'
+                            };
+
+                            const layoutTemp = {
+                                title: { text: '', font: { color: '#2c3e50' } },
+                                paper_bgcolor: 'rgba(0,0,0,0)',
+                                plot_bgcolor: 'rgba(0,0,0,0)',
+                                showlegend: false,
+                                margin: { l: 50, r: 50, t: 20, b: 40 },
+                                xaxis: { color: '#7f8c8d', showgrid: false },
+                                yaxis: {
+                                    title: 'Deviation (°C)',
+                                    color: '#7f8c8d',
+                                    showgrid: true,
+                                    gridcolor: 'rgba(0,0,0,0.05)',
+                                    zeroline: true,
+                                    zerolinecolor: 'rgba(0,0,0,0.2)'
+                                }
+                            };
+
+                            Plotly.newPlot('tempChart', [traceTempDev], layoutTemp);
+
+                            Plotly.newPlot('trendChart', [traceSteps, traceBatt, traceBattGain, traceRHR, traceStress, traceHRV], layout1, { responsive: true, displayModeBar: false });
 
                             // CHART 2: Metabolic Health
                             const traceCost = {

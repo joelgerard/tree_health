@@ -1209,7 +1209,8 @@ def get_time_series_data(target_date):
         "cost": [],
         "active_cals": [],
         "hrv": [],
-        "body_temp": []
+        "body_temp": [],
+        "temp_dev": []
     }
     
     try:
@@ -1284,6 +1285,7 @@ def get_time_series_data(target_date):
 
             # Body Temperature (Oura)
             body_temp = None
+            temp_dev = 0
             if cursor_oura:
                 try:
                     cursor_oura.execute("SELECT temperature_deviation FROM daily_readiness WHERE day = ?", (date_str,))
@@ -1291,9 +1293,11 @@ def get_time_series_data(target_date):
                     if row_oura and row_oura['temperature_deviation'] is not None:
                         # Baseline 36.6 C + deviation
                         body_temp = round(36.6 + row_oura['temperature_deviation'], 2)
+                        temp_dev = row_oura['temperature_deviation']
                 except Exception:
                     pass
             data["body_temp"].append(body_temp)
+            data["temp_dev"].append(temp_dev)
 
             current += timedelta(days=1)
             
