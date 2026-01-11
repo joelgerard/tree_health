@@ -23,6 +23,7 @@ else:
 GARMIN_DB = os.path.join(DB_DIR, "garmin.db")
 GARMIN_ACTIVITIES_DB = os.path.join(DB_DIR, "garmin_activities.db")
 GARMIN_HRV_DB = os.path.join(DB_DIR, "garmin_hrv.db")
+OURA_DB = os.path.join(DB_DIR, "oura.db")
 # Note: HRV data is now expected in garmin.db (Legacy comment?)
 SYNC_SCRIPT = os.path.expanduser("/Users/joelgerard/tree_home/export_garmin.sh")
 
@@ -602,22 +603,21 @@ def calculate_metrics(target_date, conn, conn_activities):
 
     # 3. Safety Ceiling (T-1) Logic [UPDATED]
     day_t1 = (datetime.strptime(target_date, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
-    cursor.execute("SELECT steps, calories_active FROM daily_summary WHERE day = ?", (day_t1,))
+    cursor.execute("SELECT steps, calories_active, bb_min FROM daily_summary WHERE day = ?", (day_t1,))
     row_t1 = cursor.fetchone()
     
     if row_t1:
         val_steps_t1 = row_t1['steps'] if row_t1['steps'] else 0
         val_active_cals_t1 = row_t1['calories_active'] if row_t1['calories_active'] else 0
+        val_bb_min_t1 = row_t1['bb_min'] if row_t1['bb_min'] else 100
         
         # Calculate Physiological Cost
         physio_cost_t1 = (val_active_cals_t1 / val_steps_t1 * 1000) if val_steps_t1 > 0 else 0
         
-        VOLUME_LIMIT = 3000
-        COST_LIMIT = 150
-        
-        if val_steps_t1 > VOLUME_LIMIT:
+        # High Idle Logic
+        if val_steps_t1 > 3000:
              red_flags.append(f"Volume Ceiling Breached ({val_steps_t1} steps)")
-        elif physio_cost_t1 > COST_LIMIT:
+        elif physio_cost_t1 > 150 and val_bb_min_t1 < 40:
              red_flags.append(f"High Metabolic Tax (Cost: {int(physio_cost_t1)})")
 
     # --- LOGIC GATE 5: PHYSIOLOGICAL COST (The Efficiency Check) ---
@@ -677,6 +677,33 @@ def calculate_metrics(target_date, conn, conn_activities):
         "metrics": {"rhr": rhr, "bb": bb_charged, "physio_cost": physio_cost, "steps": steps}
     }
 
+def get_oura_data(date_str):
+    """
+    Fetch Oura data for inflammation tracking.
+    """
+    try:
+        if not os.path.exists(OURA_DB):
+            return None
+            
+        conn = sqlite3.connect(OURA_DB)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT score, temperature_deviation FROM daily_readiness WHERE day = ?", (date_str,))
+        row = cursor.fetchone()
+        
+        conn.close()
+        
+        if row:
+            return {
+                "readiness_score": row['score'],
+                "temp_deviation": row['temperature_deviation']
+            }
+    except Exception as e:
+        print(f"Error fetching Oura data: {e}")
+        
+    return None
+
 def get_dashboard_context(date_str):
     """
     Encapsulates all the logic to fetch and process data for the dashboard.
@@ -711,6 +738,9 @@ def get_dashboard_context(date_str):
             "hrv": {"trend_7d": 0, "trend_3d": 0, "val": 0},
             "recent_costs": []
         }
+        
+    # Get Oura Data
+    oura_data = get_oura_data(target_date_str)
 
     # 2. Map Core Logic to UI Panels (The "Adapter" Layer)
     
@@ -779,6 +809,7 @@ def get_dashboard_context(date_str):
         },
         "respiration_warning": {"status": "GRAY", "msg": "Monitor via Oura/Manual"},
         "today_data_available": True if metrics_raw['metrics'].get('rhr') else False,
+        "oura": oura_data,
         # Keep raw metrics access if needed
         "_raw": metrics_raw['metrics']
     }
@@ -895,6 +926,18 @@ def format_dashboard_report(context):
     lines.append(status_line("Sleep Recharge", m['sleep_recharge']))
     lines.append(status_line("Efficiency Check", m['efficiency_check']))
     lines.append(f"  Physio Cost          [{m['physio_cost']['status']}] {m['physio_cost']['val']} Cals/1k ({m['physio_cost']['msg']})")
+    
+    # Oura Inflammation
+    if context.get('oura') and context['oura'].get('temp_deviation') is not None:
+        temp = context['oura']['temp_deviation']
+        if temp > 0.5:
+            temp_status = "[RED]"
+        elif temp < 0:
+            temp_status = "[GREEN]"
+        else:
+            temp_status = "[YELLOW]"
+        lines.append(f"  Inflammation (Temp)  {temp_status} {temp}°C")
+        
     lines.append("")
 
     # 4. TREND COMMAND CENTER

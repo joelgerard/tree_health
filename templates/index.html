@@ -792,15 +792,32 @@
                                     gridcolor: 'rgba(0,0,0,0.05)'
                                 },
                                 yaxis2: {
-                                    title: 'RHR / Stress',
+                                    title: 'Physio Cost',
                                     overlaying: 'y',
                                     side: 'right',
-                                    color: '#2c3e50',
+                                    range: [0, 400],
+                                    color: '#f1c40f',
                                     showgrid: false
-                                }
+                                },
+                                shapes: [
+                                    {
+                                        type: 'line',
+                                        xref: 'paper',
+                                        x0: 0,
+                                        x1: 1,
+                                        yref: 'y2',
+                                        y0: 150,
+                                        y1: 150,
+                                        line: {
+                                            color: '#e74c3c',
+                                            width: 2,
+                                            dash: 'dash'
+                                        }
+                                    }
+                                ]
                             };
 
-                            Plotly.newPlot('biometricsChart', [traceActiveCals, traceCost, traceRHR2, traceStress2], layout2, { responsive: true, displayModeBar: false });
+                            Plotly.newPlot('biometricsChart', [traceActiveCals, traceCost], layout2, { responsive: true, displayModeBar: false });
                         });
 
                     // Fetch Recovery History

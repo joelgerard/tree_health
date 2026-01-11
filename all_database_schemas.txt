@@ -1,0 +1,2031 @@
+--- DATABASE: tree/garmin_monitoring.db | TABLE: _attributes ---
+CREATE TABLE _attributes (
+	timestamp DATETIME, 
+	"key" VARCHAR NOT NULL, 
+	value VARCHAR, 
+	PRIMARY KEY ("key")
+)
+
+--- DATABASE: tree/garmin_monitoring.db | TABLE: monitoring_info ---
+CREATE TABLE monitoring_info (
+	timestamp DATETIME NOT NULL, 
+	file_id INTEGER NOT NULL, 
+	activity_type VARCHAR(17) NOT NULL, 
+	resting_metabolic_rate INTEGER, 
+	cycles_to_distance FLOAT, 
+	cycles_to_calories FLOAT, 
+	PRIMARY KEY (timestamp, activity_type)
+)
+
+--- DATABASE: tree/garmin_monitoring.db | TABLE: monitoring_hr ---
+CREATE TABLE monitoring_hr (
+	timestamp DATETIME NOT NULL, 
+	heart_rate INTEGER NOT NULL, 
+	PRIMARY KEY (timestamp)
+)
+
+--- DATABASE: tree/garmin_monitoring.db | TABLE: monitoring_intensity ---
+CREATE TABLE monitoring_intensity (
+	timestamp DATETIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	PRIMARY KEY (timestamp), 
+	UNIQUE (timestamp, moderate_activity_time, vigorous_activity_time)
+)
+
+--- DATABASE: tree/garmin_monitoring.db | TABLE: monitoring_climb ---
+CREATE TABLE monitoring_climb (
+	timestamp DATETIME NOT NULL, 
+	ascent FLOAT, 
+	descent FLOAT, 
+	cum_ascent FLOAT, 
+	cum_descent FLOAT, 
+	PRIMARY KEY (timestamp), 
+	UNIQUE (timestamp, ascent, descent, cum_ascent, cum_descent)
+)
+
+--- DATABASE: tree/garmin_monitoring.db | TABLE: monitoring ---
+CREATE TABLE monitoring (
+	timestamp DATETIME NOT NULL, 
+	activity_type VARCHAR(17) NOT NULL, 
+	intensity INTEGER, 
+	duration TIME NOT NULL, 
+	distance FLOAT, 
+	cum_active_time TIME NOT NULL, 
+	active_calories INTEGER, 
+	steps INTEGER, 
+	strokes INTEGER, 
+	cycles FLOAT, 
+	PRIMARY KEY (timestamp, activity_type)
+)
+
+--- DATABASE: tree/garmin_monitoring.db | TABLE: monitoring_rr ---
+CREATE TABLE monitoring_rr (
+	timestamp DATETIME NOT NULL, 
+	rr FLOAT NOT NULL, 
+	PRIMARY KEY (timestamp)
+)
+
+--- DATABASE: tree/garmin_monitoring.db | TABLE: monitoring_pulse_ox ---
+CREATE TABLE monitoring_pulse_ox (
+	timestamp DATETIME NOT NULL, 
+	pulse_ox FLOAT NOT NULL, 
+	PRIMARY KEY (timestamp)
+)
+
+--- DATABASE: tree/summary.db | TABLE: _attributes ---
+CREATE TABLE _attributes (
+	timestamp DATETIME, 
+	"key" VARCHAR NOT NULL, 
+	value VARCHAR, 
+	PRIMARY KEY ("key")
+)
+
+--- DATABASE: tree/summary.db | TABLE: summary ---
+CREATE TABLE summary (
+	timestamp DATETIME, 
+	"key" VARCHAR NOT NULL, 
+	value VARCHAR, 
+	PRIMARY KEY ("key")
+)
+
+--- DATABASE: tree/summary.db | TABLE: years_summary ---
+CREATE TABLE years_summary (
+	first_day DATE NOT NULL, 
+	hr_avg FLOAT, 
+	hr_min FLOAT, 
+	hr_max FLOAT, 
+	rhr_avg FLOAT, 
+	rhr_min FLOAT, 
+	rhr_max FLOAT, 
+	inactive_hr_avg FLOAT, 
+	inactive_hr_min FLOAT, 
+	inactive_hr_max FLOAT, 
+	weight_avg FLOAT, 
+	weight_min FLOAT, 
+	weight_max FLOAT, 
+	intensity_time TIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	steps INTEGER, 
+	steps_goal INTEGER, 
+	floors FLOAT, 
+	floors_goal FLOAT, 
+	sleep_avg TIME NOT NULL, 
+	sleep_min TIME NOT NULL, 
+	sleep_max TIME NOT NULL, 
+	rem_sleep_avg TIME NOT NULL, 
+	rem_sleep_min TIME NOT NULL, 
+	rem_sleep_max TIME NOT NULL, 
+	stress_avg INTEGER, 
+	calories_avg INTEGER, 
+	calories_bmr_avg INTEGER, 
+	calories_active_avg INTEGER, 
+	calories_goal INTEGER, 
+	calories_consumed_avg INTEGER, 
+	activities INTEGER, 
+	activities_calories INTEGER, 
+	activities_distance INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_avg INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss_avg INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	PRIMARY KEY (first_day)
+)
+
+--- DATABASE: tree/summary.db | TABLE: months_summary ---
+CREATE TABLE months_summary (
+	first_day DATE NOT NULL, 
+	hr_avg FLOAT, 
+	hr_min FLOAT, 
+	hr_max FLOAT, 
+	rhr_avg FLOAT, 
+	rhr_min FLOAT, 
+	rhr_max FLOAT, 
+	inactive_hr_avg FLOAT, 
+	inactive_hr_min FLOAT, 
+	inactive_hr_max FLOAT, 
+	weight_avg FLOAT, 
+	weight_min FLOAT, 
+	weight_max FLOAT, 
+	intensity_time TIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	steps INTEGER, 
+	steps_goal INTEGER, 
+	floors FLOAT, 
+	floors_goal FLOAT, 
+	sleep_avg TIME NOT NULL, 
+	sleep_min TIME NOT NULL, 
+	sleep_max TIME NOT NULL, 
+	rem_sleep_avg TIME NOT NULL, 
+	rem_sleep_min TIME NOT NULL, 
+	rem_sleep_max TIME NOT NULL, 
+	stress_avg INTEGER, 
+	calories_avg INTEGER, 
+	calories_bmr_avg INTEGER, 
+	calories_active_avg INTEGER, 
+	calories_goal INTEGER, 
+	calories_consumed_avg INTEGER, 
+	activities INTEGER, 
+	activities_calories INTEGER, 
+	activities_distance INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_avg INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss_avg INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	PRIMARY KEY (first_day)
+)
+
+--- DATABASE: tree/summary.db | TABLE: weeks_summary ---
+CREATE TABLE weeks_summary (
+	first_day DATE NOT NULL, 
+	hr_avg FLOAT, 
+	hr_min FLOAT, 
+	hr_max FLOAT, 
+	rhr_avg FLOAT, 
+	rhr_min FLOAT, 
+	rhr_max FLOAT, 
+	inactive_hr_avg FLOAT, 
+	inactive_hr_min FLOAT, 
+	inactive_hr_max FLOAT, 
+	weight_avg FLOAT, 
+	weight_min FLOAT, 
+	weight_max FLOAT, 
+	intensity_time TIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	steps INTEGER, 
+	steps_goal INTEGER, 
+	floors FLOAT, 
+	floors_goal FLOAT, 
+	sleep_avg TIME NOT NULL, 
+	sleep_min TIME NOT NULL, 
+	sleep_max TIME NOT NULL, 
+	rem_sleep_avg TIME NOT NULL, 
+	rem_sleep_min TIME NOT NULL, 
+	rem_sleep_max TIME NOT NULL, 
+	stress_avg INTEGER, 
+	calories_avg INTEGER, 
+	calories_bmr_avg INTEGER, 
+	calories_active_avg INTEGER, 
+	calories_goal INTEGER, 
+	calories_consumed_avg INTEGER, 
+	activities INTEGER, 
+	activities_calories INTEGER, 
+	activities_distance INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_avg INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss_avg INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	PRIMARY KEY (first_day)
+)
+
+--- DATABASE: tree/summary.db | TABLE: days_summary ---
+CREATE TABLE days_summary (
+	day DATE NOT NULL, 
+	hr_avg FLOAT, 
+	hr_min FLOAT, 
+	hr_max FLOAT, 
+	rhr_avg FLOAT, 
+	rhr_min FLOAT, 
+	rhr_max FLOAT, 
+	inactive_hr_avg FLOAT, 
+	inactive_hr_min FLOAT, 
+	inactive_hr_max FLOAT, 
+	weight_avg FLOAT, 
+	weight_min FLOAT, 
+	weight_max FLOAT, 
+	intensity_time TIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	steps INTEGER, 
+	steps_goal INTEGER, 
+	floors FLOAT, 
+	floors_goal FLOAT, 
+	sleep_avg TIME NOT NULL, 
+	sleep_min TIME NOT NULL, 
+	sleep_max TIME NOT NULL, 
+	rem_sleep_avg TIME NOT NULL, 
+	rem_sleep_min TIME NOT NULL, 
+	rem_sleep_max TIME NOT NULL, 
+	stress_avg INTEGER, 
+	calories_avg INTEGER, 
+	calories_bmr_avg INTEGER, 
+	calories_active_avg INTEGER, 
+	calories_goal INTEGER, 
+	calories_consumed_avg INTEGER, 
+	activities INTEGER, 
+	activities_calories INTEGER, 
+	activities_distance INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_avg INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss_avg INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: tree/garmin_activities.db | TABLE: _attributes ---
+CREATE TABLE _attributes (
+	timestamp DATETIME, 
+	"key" VARCHAR NOT NULL, 
+	value VARCHAR, 
+	PRIMARY KEY ("key")
+)
+
+--- DATABASE: tree/garmin_activities.db | TABLE: activities ---
+CREATE TABLE activities (
+	activity_id VARCHAR NOT NULL, 
+	name VARCHAR, 
+	description VARCHAR, 
+	type VARCHAR, 
+	course_id INTEGER, 
+	laps INTEGER, 
+	sport VARCHAR, 
+	sub_sport VARCHAR, 
+	device_serial_number INTEGER, 
+	self_eval_feel VARCHAR, 
+	self_eval_effort VARCHAR, 
+	training_load FLOAT, 
+	training_effect FLOAT, 
+	anaerobic_training_effect FLOAT, 
+	start_time DATETIME, 
+	stop_time DATETIME, 
+	elapsed_time TIME NOT NULL, 
+	moving_time TIME NOT NULL, 
+	distance FLOAT, 
+	cycles FLOAT, 
+	avg_hr INTEGER, 
+	max_hr INTEGER, 
+	avg_rr FLOAT, 
+	max_rr FLOAT, 
+	calories INTEGER, 
+	avg_cadence INTEGER, 
+	max_cadence INTEGER, 
+	avg_speed FLOAT, 
+	max_speed FLOAT, 
+	ascent FLOAT, 
+	descent FLOAT, 
+	max_temperature FLOAT, 
+	min_temperature FLOAT, 
+	avg_temperature FLOAT, 
+	start_lat FLOAT, 
+	start_long FLOAT, 
+	stop_lat FLOAT, 
+	stop_long FLOAT, 
+	hr_zones_method VARCHAR(18), 
+	hrz_1_hr INTEGER, 
+	hrz_2_hr INTEGER, 
+	hrz_3_hr INTEGER, 
+	hrz_4_hr INTEGER, 
+	hrz_5_hr INTEGER, 
+	hrz_1_time TIME NOT NULL, 
+	hrz_2_time TIME NOT NULL, 
+	hrz_3_time TIME NOT NULL, 
+	hrz_4_time TIME NOT NULL, 
+	hrz_5_time TIME NOT NULL, 
+	PRIMARY KEY (activity_id)
+)
+
+--- DATABASE: tree/garmin_activities.db | TABLE: activities_devices ---
+CREATE TABLE activities_devices (
+	activity_id VARCHAR NOT NULL, 
+	device_serial_number INTEGER NOT NULL, 
+	PRIMARY KEY (activity_id, device_serial_number)
+)
+
+--- DATABASE: tree/garmin_activities.db | TABLE: activity_laps ---
+CREATE TABLE activity_laps (
+	activity_id VARCHAR NOT NULL, 
+	lap INTEGER NOT NULL, 
+	start_time DATETIME, 
+	stop_time DATETIME, 
+	elapsed_time TIME NOT NULL, 
+	moving_time TIME NOT NULL, 
+	distance FLOAT, 
+	cycles FLOAT, 
+	avg_hr INTEGER, 
+	max_hr INTEGER, 
+	avg_rr FLOAT, 
+	max_rr FLOAT, 
+	calories INTEGER, 
+	avg_cadence INTEGER, 
+	max_cadence INTEGER, 
+	avg_speed FLOAT, 
+	max_speed FLOAT, 
+	ascent FLOAT, 
+	descent FLOAT, 
+	max_temperature FLOAT, 
+	min_temperature FLOAT, 
+	avg_temperature FLOAT, 
+	start_lat FLOAT, 
+	start_long FLOAT, 
+	stop_lat FLOAT, 
+	stop_long FLOAT, 
+	hr_zones_method VARCHAR(18), 
+	hrz_1_hr INTEGER, 
+	hrz_2_hr INTEGER, 
+	hrz_3_hr INTEGER, 
+	hrz_4_hr INTEGER, 
+	hrz_5_hr INTEGER, 
+	hrz_1_time TIME NOT NULL, 
+	hrz_2_time TIME NOT NULL, 
+	hrz_3_time TIME NOT NULL, 
+	hrz_4_time TIME NOT NULL, 
+	hrz_5_time TIME NOT NULL, 
+	PRIMARY KEY (activity_id, lap), 
+	FOREIGN KEY(activity_id) REFERENCES activities (activity_id)
+)
+
+--- DATABASE: tree/garmin_activities.db | TABLE: activity_splits ---
+CREATE TABLE activity_splits (
+	activity_id VARCHAR NOT NULL, 
+	split INTEGER NOT NULL, 
+	grade VARCHAR, 
+	completed BOOLEAN, 
+	falls INTEGER, 
+	start_time DATETIME, 
+	stop_time DATETIME, 
+	elapsed_time TIME NOT NULL, 
+	moving_time TIME NOT NULL, 
+	distance FLOAT, 
+	cycles FLOAT, 
+	avg_hr INTEGER, 
+	max_hr INTEGER, 
+	avg_rr FLOAT, 
+	max_rr FLOAT, 
+	calories INTEGER, 
+	avg_cadence INTEGER, 
+	max_cadence INTEGER, 
+	avg_speed FLOAT, 
+	max_speed FLOAT, 
+	ascent FLOAT, 
+	descent FLOAT, 
+	max_temperature FLOAT, 
+	min_temperature FLOAT, 
+	avg_temperature FLOAT, 
+	start_lat FLOAT, 
+	start_long FLOAT, 
+	stop_lat FLOAT, 
+	stop_long FLOAT, 
+	hr_zones_method VARCHAR(18), 
+	hrz_1_hr INTEGER, 
+	hrz_2_hr INTEGER, 
+	hrz_3_hr INTEGER, 
+	hrz_4_hr INTEGER, 
+	hrz_5_hr INTEGER, 
+	hrz_1_time TIME NOT NULL, 
+	hrz_2_time TIME NOT NULL, 
+	hrz_3_time TIME NOT NULL, 
+	hrz_4_time TIME NOT NULL, 
+	hrz_5_time TIME NOT NULL, 
+	PRIMARY KEY (activity_id, split), 
+	FOREIGN KEY(activity_id) REFERENCES activities (activity_id)
+)
+
+--- DATABASE: tree/garmin_activities.db | TABLE: activity_records ---
+CREATE TABLE activity_records (
+	activity_id VARCHAR NOT NULL, 
+	record INTEGER NOT NULL, 
+	timestamp DATETIME, 
+	position_lat FLOAT, 
+	position_long FLOAT, 
+	distance FLOAT, 
+	cadence INTEGER, 
+	altitude FLOAT, 
+	hr INTEGER, 
+	rr FLOAT, 
+	speed FLOAT, 
+	temperature FLOAT, 
+	PRIMARY KEY (activity_id, record), 
+	FOREIGN KEY(activity_id) REFERENCES activities (activity_id)
+)
+
+--- DATABASE: tree/garmin_activities.db | TABLE: steps_activities ---
+CREATE TABLE steps_activities (
+	steps INTEGER, 
+	avg_pace TIME NOT NULL, 
+	avg_moving_pace TIME NOT NULL, 
+	max_pace TIME NOT NULL, 
+	avg_steps_per_min INTEGER, 
+	max_steps_per_min INTEGER, 
+	avg_step_length FLOAT, 
+	avg_vertical_ratio FLOAT, 
+	avg_vertical_oscillation FLOAT, 
+	avg_gct_balance FLOAT, 
+	avg_ground_contact_time TIME NOT NULL, 
+	avg_stance_time_percent FLOAT, 
+	vo2_max FLOAT, 
+	activity_id VARCHAR NOT NULL, 
+	PRIMARY KEY (activity_id), 
+	FOREIGN KEY(activity_id) REFERENCES activities (activity_id)
+)
+
+--- DATABASE: tree/garmin_activities.db | TABLE: paddle_activities ---
+CREATE TABLE paddle_activities (
+	strokes INTEGER, 
+	avg_stroke_distance FLOAT, 
+	activity_id VARCHAR NOT NULL, 
+	PRIMARY KEY (activity_id), 
+	FOREIGN KEY(activity_id) REFERENCES activities (activity_id)
+)
+
+--- DATABASE: tree/garmin_activities.db | TABLE: cycle_activities ---
+CREATE TABLE cycle_activities (
+	strokes INTEGER, 
+	vo2_max FLOAT, 
+	activity_id VARCHAR NOT NULL, 
+	PRIMARY KEY (activity_id), 
+	FOREIGN KEY(activity_id) REFERENCES activities (activity_id)
+)
+
+--- DATABASE: tree/garmin_activities.db | TABLE: climbing_activities ---
+CREATE TABLE climbing_activities (
+	total_routes INTEGER, 
+	activity_id VARCHAR NOT NULL, 
+	PRIMARY KEY (activity_id), 
+	FOREIGN KEY(activity_id) REFERENCES activities (activity_id)
+)
+
+--- DATABASE: tree/garmin_summary.db | TABLE: _attributes ---
+CREATE TABLE _attributes (
+	timestamp DATETIME, 
+	"key" VARCHAR NOT NULL, 
+	value VARCHAR, 
+	PRIMARY KEY ("key")
+)
+
+--- DATABASE: tree/garmin_summary.db | TABLE: summary ---
+CREATE TABLE summary (
+	timestamp DATETIME, 
+	"key" VARCHAR NOT NULL, 
+	value VARCHAR, 
+	PRIMARY KEY ("key")
+)
+
+--- DATABASE: tree/garmin_summary.db | TABLE: years_summary ---
+CREATE TABLE years_summary (
+	first_day DATE NOT NULL, 
+	hr_avg FLOAT, 
+	hr_min FLOAT, 
+	hr_max FLOAT, 
+	rhr_avg FLOAT, 
+	rhr_min FLOAT, 
+	rhr_max FLOAT, 
+	inactive_hr_avg FLOAT, 
+	inactive_hr_min FLOAT, 
+	inactive_hr_max FLOAT, 
+	weight_avg FLOAT, 
+	weight_min FLOAT, 
+	weight_max FLOAT, 
+	intensity_time TIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	steps INTEGER, 
+	steps_goal INTEGER, 
+	floors FLOAT, 
+	floors_goal FLOAT, 
+	sleep_avg TIME NOT NULL, 
+	sleep_min TIME NOT NULL, 
+	sleep_max TIME NOT NULL, 
+	rem_sleep_avg TIME NOT NULL, 
+	rem_sleep_min TIME NOT NULL, 
+	rem_sleep_max TIME NOT NULL, 
+	stress_avg INTEGER, 
+	calories_avg INTEGER, 
+	calories_bmr_avg INTEGER, 
+	calories_active_avg INTEGER, 
+	calories_goal INTEGER, 
+	calories_consumed_avg INTEGER, 
+	activities INTEGER, 
+	activities_calories INTEGER, 
+	activities_distance INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_avg INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss_avg INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	PRIMARY KEY (first_day)
+)
+
+--- DATABASE: tree/garmin_summary.db | TABLE: months_summary ---
+CREATE TABLE months_summary (
+	first_day DATE NOT NULL, 
+	hr_avg FLOAT, 
+	hr_min FLOAT, 
+	hr_max FLOAT, 
+	rhr_avg FLOAT, 
+	rhr_min FLOAT, 
+	rhr_max FLOAT, 
+	inactive_hr_avg FLOAT, 
+	inactive_hr_min FLOAT, 
+	inactive_hr_max FLOAT, 
+	weight_avg FLOAT, 
+	weight_min FLOAT, 
+	weight_max FLOAT, 
+	intensity_time TIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	steps INTEGER, 
+	steps_goal INTEGER, 
+	floors FLOAT, 
+	floors_goal FLOAT, 
+	sleep_avg TIME NOT NULL, 
+	sleep_min TIME NOT NULL, 
+	sleep_max TIME NOT NULL, 
+	rem_sleep_avg TIME NOT NULL, 
+	rem_sleep_min TIME NOT NULL, 
+	rem_sleep_max TIME NOT NULL, 
+	stress_avg INTEGER, 
+	calories_avg INTEGER, 
+	calories_bmr_avg INTEGER, 
+	calories_active_avg INTEGER, 
+	calories_goal INTEGER, 
+	calories_consumed_avg INTEGER, 
+	activities INTEGER, 
+	activities_calories INTEGER, 
+	activities_distance INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_avg INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss_avg INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	PRIMARY KEY (first_day)
+)
+
+--- DATABASE: tree/garmin_summary.db | TABLE: weeks_summary ---
+CREATE TABLE weeks_summary (
+	first_day DATE NOT NULL, 
+	hr_avg FLOAT, 
+	hr_min FLOAT, 
+	hr_max FLOAT, 
+	rhr_avg FLOAT, 
+	rhr_min FLOAT, 
+	rhr_max FLOAT, 
+	inactive_hr_avg FLOAT, 
+	inactive_hr_min FLOAT, 
+	inactive_hr_max FLOAT, 
+	weight_avg FLOAT, 
+	weight_min FLOAT, 
+	weight_max FLOAT, 
+	intensity_time TIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	steps INTEGER, 
+	steps_goal INTEGER, 
+	floors FLOAT, 
+	floors_goal FLOAT, 
+	sleep_avg TIME NOT NULL, 
+	sleep_min TIME NOT NULL, 
+	sleep_max TIME NOT NULL, 
+	rem_sleep_avg TIME NOT NULL, 
+	rem_sleep_min TIME NOT NULL, 
+	rem_sleep_max TIME NOT NULL, 
+	stress_avg INTEGER, 
+	calories_avg INTEGER, 
+	calories_bmr_avg INTEGER, 
+	calories_active_avg INTEGER, 
+	calories_goal INTEGER, 
+	calories_consumed_avg INTEGER, 
+	activities INTEGER, 
+	activities_calories INTEGER, 
+	activities_distance INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_avg INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss_avg INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	PRIMARY KEY (first_day)
+)
+
+--- DATABASE: tree/garmin_summary.db | TABLE: days_summary ---
+CREATE TABLE days_summary (
+	day DATE NOT NULL, 
+	hr_avg FLOAT, 
+	hr_min FLOAT, 
+	hr_max FLOAT, 
+	rhr_avg FLOAT, 
+	rhr_min FLOAT, 
+	rhr_max FLOAT, 
+	inactive_hr_avg FLOAT, 
+	inactive_hr_min FLOAT, 
+	inactive_hr_max FLOAT, 
+	weight_avg FLOAT, 
+	weight_min FLOAT, 
+	weight_max FLOAT, 
+	intensity_time TIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	steps INTEGER, 
+	steps_goal INTEGER, 
+	floors FLOAT, 
+	floors_goal FLOAT, 
+	sleep_avg TIME NOT NULL, 
+	sleep_min TIME NOT NULL, 
+	sleep_max TIME NOT NULL, 
+	rem_sleep_avg TIME NOT NULL, 
+	rem_sleep_min TIME NOT NULL, 
+	rem_sleep_max TIME NOT NULL, 
+	stress_avg INTEGER, 
+	calories_avg INTEGER, 
+	calories_bmr_avg INTEGER, 
+	calories_active_avg INTEGER, 
+	calories_goal INTEGER, 
+	calories_consumed_avg INTEGER, 
+	activities INTEGER, 
+	activities_calories INTEGER, 
+	activities_distance INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_avg INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss_avg INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: tree/garmin_summary.db | TABLE: intensity_hr ---
+CREATE TABLE intensity_hr (
+	timestamp DATETIME NOT NULL, 
+	intensity INTEGER NOT NULL, 
+	heart_rate INTEGER NOT NULL, 
+	PRIMARY KEY (timestamp)
+)
+
+--- DATABASE: tree/oura.db | TABLE: _attributes ---
+CREATE TABLE _attributes (
+	timestamp DATETIME, 
+	"key" VARCHAR NOT NULL, 
+	value VARCHAR, 
+	PRIMARY KEY ("key")
+)
+
+--- DATABASE: tree/oura.db | TABLE: profile ---
+CREATE TABLE profile (
+	id VARCHAR NOT NULL, 
+	email VARCHAR, 
+	weight FLOAT, 
+	height FLOAT, 
+	age INTEGER, 
+	biological_sex VARCHAR, 
+	PRIMARY KEY (id)
+)
+
+--- DATABASE: tree/oura.db | TABLE: daily_sleep ---
+CREATE TABLE daily_sleep (
+	day DATE NOT NULL, 
+	score INTEGER, 
+	contributors JSON, 
+	id VARCHAR, 
+	timestamp DATETIME, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: tree/oura.db | TABLE: daily_activity ---
+CREATE TABLE daily_activity (
+	day DATE NOT NULL, 
+	score INTEGER, 
+	active_calories INTEGER, 
+	average_met FLOAT, 
+	contributers JSON, 
+	equivalent_walking_distance INTEGER, 
+	high_activity_met_min INTEGER, 
+	high_activity_time INTEGER, 
+	inactivity_alerts INTEGER, 
+	low_activity_met_min INTEGER, 
+	low_activity_time INTEGER, 
+	medium_activity_met_min INTEGER, 
+	medium_activity_time INTEGER, 
+	met JSON, 
+	meters_to_target INTEGER, 
+	non_wear_time INTEGER, 
+	resting_time INTEGER, 
+	sedentary_met_min INTEGER, 
+	sedentary_time INTEGER, 
+	steps INTEGER, 
+	target_calories INTEGER, 
+	target_meters INTEGER, 
+	total_calories INTEGER, 
+	timestamp DATETIME, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: tree/oura.db | TABLE: daily_readiness ---
+CREATE TABLE daily_readiness (
+	day DATE NOT NULL, 
+	score INTEGER, 
+	contributors JSON, 
+	temperature_deviation FLOAT, 
+	temperature_trend_deviation FLOAT, 
+	timestamp DATETIME, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: tree/oura.db | TABLE: heartrate ---
+CREATE TABLE heartrate (
+	timestamp DATETIME NOT NULL, 
+	bpm INTEGER, 
+	source VARCHAR, 
+	PRIMARY KEY (timestamp)
+)
+
+--- DATABASE: tree/oura.db | TABLE: sessions ---
+CREATE TABLE sessions (
+	id VARCHAR NOT NULL, 
+	day DATE, 
+	start_datetime DATETIME, 
+	end_datetime DATETIME, 
+	type VARCHAR, 
+	mood VARCHAR, 
+	motion_count JSON, 
+	PRIMARY KEY (id)
+)
+
+--- DATABASE: tree/oura.db | TABLE: workouts ---
+CREATE TABLE workouts (
+	id VARCHAR NOT NULL, 
+	day DATE, 
+	start_datetime DATETIME, 
+	end_datetime DATETIME, 
+	activity VARCHAR, 
+	calories FLOAT, 
+	distance FLOAT, 
+	PRIMARY KEY (id)
+)
+
+--- DATABASE: tree/oura.db | TABLE: tags ---
+CREATE TABLE tags (
+	id VARCHAR NOT NULL, 
+	day DATE, 
+	text VARCHAR, 
+	timestamp DATETIME, 
+	tags JSON, 
+	PRIMARY KEY (id)
+)
+
+--- DATABASE: tree/oura.db | TABLE: spo2 ---
+CREATE TABLE spo2 (
+	day DATE NOT NULL, 
+	average FLOAT, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: tree/oura.db | TABLE: stress ---
+CREATE TABLE stress (
+	day DATE NOT NULL, 
+	stress_high INTEGER, 
+	recovery_high INTEGER, 
+	day_summary JSON, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: tree/oura.db | TABLE: ring_configuration ---
+CREATE TABLE ring_configuration (
+	id VARCHAR NOT NULL, 
+	color VARCHAR, 
+	design VARCHAR, 
+	firmware_version VARCHAR, 
+	hardware_type VARCHAR, 
+	model VARCHAR, 
+	size INTEGER, 
+	PRIMARY KEY (id)
+)
+
+--- DATABASE: tree/oura.db | TABLE: heart_health ---
+CREATE TABLE heart_health (
+	day DATE NOT NULL, 
+	vascular_age INTEGER, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: tree/garmin.db | TABLE: _attributes ---
+CREATE TABLE _attributes (
+	timestamp DATETIME, 
+	"key" VARCHAR NOT NULL, 
+	value VARCHAR, 
+	PRIMARY KEY ("key")
+)
+
+--- DATABASE: tree/garmin.db | TABLE: attributes ---
+CREATE TABLE attributes (
+	timestamp DATETIME, 
+	"key" VARCHAR NOT NULL, 
+	value VARCHAR, 
+	PRIMARY KEY ("key")
+)
+
+--- DATABASE: tree/garmin.db | TABLE: devices ---
+CREATE TABLE devices (
+	serial_number INTEGER NOT NULL, 
+	timestamp DATETIME, 
+	device_type VARCHAR, 
+	manufacturer VARCHAR(28), 
+	product VARCHAR, 
+	hardware_version VARCHAR, 
+	PRIMARY KEY (serial_number)
+)
+
+--- DATABASE: tree/garmin.db | TABLE: weight ---
+CREATE TABLE weight (
+	day DATE NOT NULL, 
+	weight FLOAT NOT NULL, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: tree/garmin.db | TABLE: stress ---
+CREATE TABLE stress (
+	timestamp DATETIME NOT NULL, 
+	stress INTEGER NOT NULL, 
+	PRIMARY KEY (timestamp), 
+	UNIQUE (timestamp)
+)
+
+--- DATABASE: tree/garmin.db | TABLE: sleep ---
+CREATE TABLE sleep (
+	day DATE NOT NULL, 
+	start DATETIME, 
+	"end" DATETIME, 
+	total_sleep TIME NOT NULL, 
+	deep_sleep TIME NOT NULL, 
+	light_sleep TIME NOT NULL, 
+	rem_sleep TIME NOT NULL, 
+	awake TIME NOT NULL, 
+	avg_spo2 FLOAT, 
+	avg_rr FLOAT, 
+	avg_stress FLOAT, 
+	score INTEGER, 
+	qualifier VARCHAR, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: tree/garmin.db | TABLE: sleep_events ---
+CREATE TABLE sleep_events (
+	timestamp DATETIME NOT NULL, 
+	event VARCHAR, 
+	duration TIME NOT NULL, 
+	PRIMARY KEY (timestamp)
+)
+
+--- DATABASE: tree/garmin.db | TABLE: resting_hr ---
+CREATE TABLE resting_hr (
+	day DATE NOT NULL, 
+	resting_heart_rate FLOAT, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: tree/garmin.db | TABLE: daily_summary ---
+CREATE TABLE daily_summary (
+	day DATE NOT NULL, 
+	hr_min INTEGER, 
+	hr_max INTEGER, 
+	rhr INTEGER, 
+	stress_avg INTEGER, 
+	step_goal INTEGER, 
+	steps INTEGER, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	floors_up FLOAT, 
+	floors_down FLOAT, 
+	floors_goal FLOAT, 
+	distance FLOAT, 
+	calories_goal INTEGER, 
+	calories_total INTEGER, 
+	calories_bmr INTEGER, 
+	calories_active INTEGER, 
+	calories_consumed INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_charged INTEGER, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	description VARCHAR, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: tree/garmin.db | TABLE: files ---
+CREATE TABLE files (
+	id VARCHAR NOT NULL, 
+	name VARCHAR, 
+	type VARCHAR(28) NOT NULL, 
+	serial_number INTEGER, 
+	PRIMARY KEY (id), 
+	UNIQUE (name), 
+	FOREIGN KEY(serial_number) REFERENCES devices (serial_number)
+)
+
+--- DATABASE: tree/garmin.db | TABLE: device_info ---
+CREATE TABLE device_info (
+	timestamp DATETIME NOT NULL, 
+	file_id VARCHAR, 
+	serial_number INTEGER NOT NULL, 
+	software_version VARCHAR, 
+	cum_operating_time TIME NOT NULL, 
+	battery_status VARCHAR(8), 
+	battery_voltage FLOAT, 
+	PRIMARY KEY (timestamp, serial_number), 
+	FOREIGN KEY(file_id) REFERENCES files (id), 
+	FOREIGN KEY(serial_number) REFERENCES devices (serial_number)
+)
+
+--- DATABASE: tree/garmin.db | TABLE: hrv ---
+CREATE TABLE hrv (
+    day DATE NOT NULL,
+    weekly_avg INTEGER,
+    last_night_avg INTEGER,
+    last_night_5min_high INTEGER,
+    baseline_low INTEGER,
+    baseline_upper INTEGER,
+    status TEXT,
+    PRIMARY KEY (day)
+)
+
+--- DATABASE: joel/garmin_monitoring.db | TABLE: _attributes ---
+CREATE TABLE _attributes (
+	timestamp DATETIME, 
+	"key" VARCHAR NOT NULL, 
+	value VARCHAR, 
+	PRIMARY KEY ("key")
+)
+
+--- DATABASE: joel/garmin_monitoring.db | TABLE: monitoring_info ---
+CREATE TABLE monitoring_info (
+	timestamp DATETIME NOT NULL, 
+	file_id INTEGER NOT NULL, 
+	activity_type VARCHAR(17) NOT NULL, 
+	resting_metabolic_rate INTEGER, 
+	cycles_to_distance FLOAT, 
+	cycles_to_calories FLOAT, 
+	PRIMARY KEY (timestamp, activity_type)
+)
+
+--- DATABASE: joel/garmin_monitoring.db | TABLE: monitoring_hr ---
+CREATE TABLE monitoring_hr (
+	timestamp DATETIME NOT NULL, 
+	heart_rate INTEGER NOT NULL, 
+	PRIMARY KEY (timestamp)
+)
+
+--- DATABASE: joel/garmin_monitoring.db | TABLE: monitoring_intensity ---
+CREATE TABLE monitoring_intensity (
+	timestamp DATETIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	PRIMARY KEY (timestamp), 
+	UNIQUE (timestamp, moderate_activity_time, vigorous_activity_time)
+)
+
+--- DATABASE: joel/garmin_monitoring.db | TABLE: monitoring_climb ---
+CREATE TABLE monitoring_climb (
+	timestamp DATETIME NOT NULL, 
+	ascent FLOAT, 
+	descent FLOAT, 
+	cum_ascent FLOAT, 
+	cum_descent FLOAT, 
+	PRIMARY KEY (timestamp), 
+	UNIQUE (timestamp, ascent, descent, cum_ascent, cum_descent)
+)
+
+--- DATABASE: joel/garmin_monitoring.db | TABLE: monitoring ---
+CREATE TABLE monitoring (
+	timestamp DATETIME NOT NULL, 
+	activity_type VARCHAR(17) NOT NULL, 
+	intensity INTEGER, 
+	duration TIME NOT NULL, 
+	distance FLOAT, 
+	cum_active_time TIME NOT NULL, 
+	active_calories INTEGER, 
+	steps INTEGER, 
+	strokes INTEGER, 
+	cycles FLOAT, 
+	PRIMARY KEY (timestamp, activity_type)
+)
+
+--- DATABASE: joel/garmin_monitoring.db | TABLE: monitoring_rr ---
+CREATE TABLE monitoring_rr (
+	timestamp DATETIME NOT NULL, 
+	rr FLOAT NOT NULL, 
+	PRIMARY KEY (timestamp)
+)
+
+--- DATABASE: joel/garmin_monitoring.db | TABLE: monitoring_pulse_ox ---
+CREATE TABLE monitoring_pulse_ox (
+	timestamp DATETIME NOT NULL, 
+	pulse_ox FLOAT NOT NULL, 
+	PRIMARY KEY (timestamp)
+)
+
+--- DATABASE: joel/summary.db | TABLE: _attributes ---
+CREATE TABLE _attributes (
+	timestamp DATETIME, 
+	"key" VARCHAR NOT NULL, 
+	value VARCHAR, 
+	PRIMARY KEY ("key")
+)
+
+--- DATABASE: joel/summary.db | TABLE: summary ---
+CREATE TABLE summary (
+	timestamp DATETIME, 
+	"key" VARCHAR NOT NULL, 
+	value VARCHAR, 
+	PRIMARY KEY ("key")
+)
+
+--- DATABASE: joel/summary.db | TABLE: years_summary ---
+CREATE TABLE years_summary (
+	first_day DATE NOT NULL, 
+	hr_avg FLOAT, 
+	hr_min FLOAT, 
+	hr_max FLOAT, 
+	rhr_avg FLOAT, 
+	rhr_min FLOAT, 
+	rhr_max FLOAT, 
+	inactive_hr_avg FLOAT, 
+	inactive_hr_min FLOAT, 
+	inactive_hr_max FLOAT, 
+	weight_avg FLOAT, 
+	weight_min FLOAT, 
+	weight_max FLOAT, 
+	bmi_avg FLOAT, 
+	body_fat_avg FLOAT, 
+	body_water_avg FLOAT, 
+	bone_mass_avg FLOAT, 
+	muscle_mass_avg FLOAT, 
+	visceral_fat_avg FLOAT, 
+	intensity_time TIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	steps INTEGER, 
+	steps_goal INTEGER, 
+	floors FLOAT, 
+	floors_goal FLOAT, 
+	sleep_avg TIME NOT NULL, 
+	sleep_min TIME NOT NULL, 
+	sleep_max TIME NOT NULL, 
+	rem_sleep_avg TIME NOT NULL, 
+	rem_sleep_min TIME NOT NULL, 
+	rem_sleep_max TIME NOT NULL, 
+	stress_avg INTEGER, 
+	calories_avg INTEGER, 
+	calories_bmr_avg INTEGER, 
+	calories_active_avg INTEGER, 
+	calories_goal INTEGER, 
+	calories_consumed_avg INTEGER, 
+	activities INTEGER, 
+	activities_calories INTEGER, 
+	activities_distance INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_avg INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss_avg INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	PRIMARY KEY (first_day)
+)
+
+--- DATABASE: joel/summary.db | TABLE: months_summary ---
+CREATE TABLE months_summary (
+	first_day DATE NOT NULL, 
+	hr_avg FLOAT, 
+	hr_min FLOAT, 
+	hr_max FLOAT, 
+	rhr_avg FLOAT, 
+	rhr_min FLOAT, 
+	rhr_max FLOAT, 
+	inactive_hr_avg FLOAT, 
+	inactive_hr_min FLOAT, 
+	inactive_hr_max FLOAT, 
+	weight_avg FLOAT, 
+	weight_min FLOAT, 
+	weight_max FLOAT, 
+	bmi_avg FLOAT, 
+	body_fat_avg FLOAT, 
+	body_water_avg FLOAT, 
+	bone_mass_avg FLOAT, 
+	muscle_mass_avg FLOAT, 
+	visceral_fat_avg FLOAT, 
+	intensity_time TIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	steps INTEGER, 
+	steps_goal INTEGER, 
+	floors FLOAT, 
+	floors_goal FLOAT, 
+	sleep_avg TIME NOT NULL, 
+	sleep_min TIME NOT NULL, 
+	sleep_max TIME NOT NULL, 
+	rem_sleep_avg TIME NOT NULL, 
+	rem_sleep_min TIME NOT NULL, 
+	rem_sleep_max TIME NOT NULL, 
+	stress_avg INTEGER, 
+	calories_avg INTEGER, 
+	calories_bmr_avg INTEGER, 
+	calories_active_avg INTEGER, 
+	calories_goal INTEGER, 
+	calories_consumed_avg INTEGER, 
+	activities INTEGER, 
+	activities_calories INTEGER, 
+	activities_distance INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_avg INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss_avg INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	PRIMARY KEY (first_day)
+)
+
+--- DATABASE: joel/summary.db | TABLE: weeks_summary ---
+CREATE TABLE weeks_summary (
+	first_day DATE NOT NULL, 
+	hr_avg FLOAT, 
+	hr_min FLOAT, 
+	hr_max FLOAT, 
+	rhr_avg FLOAT, 
+	rhr_min FLOAT, 
+	rhr_max FLOAT, 
+	inactive_hr_avg FLOAT, 
+	inactive_hr_min FLOAT, 
+	inactive_hr_max FLOAT, 
+	weight_avg FLOAT, 
+	weight_min FLOAT, 
+	weight_max FLOAT, 
+	bmi_avg FLOAT, 
+	body_fat_avg FLOAT, 
+	body_water_avg FLOAT, 
+	bone_mass_avg FLOAT, 
+	muscle_mass_avg FLOAT, 
+	visceral_fat_avg FLOAT, 
+	intensity_time TIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	steps INTEGER, 
+	steps_goal INTEGER, 
+	floors FLOAT, 
+	floors_goal FLOAT, 
+	sleep_avg TIME NOT NULL, 
+	sleep_min TIME NOT NULL, 
+	sleep_max TIME NOT NULL, 
+	rem_sleep_avg TIME NOT NULL, 
+	rem_sleep_min TIME NOT NULL, 
+	rem_sleep_max TIME NOT NULL, 
+	stress_avg INTEGER, 
+	calories_avg INTEGER, 
+	calories_bmr_avg INTEGER, 
+	calories_active_avg INTEGER, 
+	calories_goal INTEGER, 
+	calories_consumed_avg INTEGER, 
+	activities INTEGER, 
+	activities_calories INTEGER, 
+	activities_distance INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_avg INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss_avg INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	PRIMARY KEY (first_day)
+)
+
+--- DATABASE: joel/summary.db | TABLE: days_summary ---
+CREATE TABLE days_summary (
+	day DATE NOT NULL, 
+	hr_avg FLOAT, 
+	hr_min FLOAT, 
+	hr_max FLOAT, 
+	rhr_avg FLOAT, 
+	rhr_min FLOAT, 
+	rhr_max FLOAT, 
+	inactive_hr_avg FLOAT, 
+	inactive_hr_min FLOAT, 
+	inactive_hr_max FLOAT, 
+	weight_avg FLOAT, 
+	weight_min FLOAT, 
+	weight_max FLOAT, 
+	bmi_avg FLOAT, 
+	body_fat_avg FLOAT, 
+	body_water_avg FLOAT, 
+	bone_mass_avg FLOAT, 
+	muscle_mass_avg FLOAT, 
+	visceral_fat_avg FLOAT, 
+	intensity_time TIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	steps INTEGER, 
+	steps_goal INTEGER, 
+	floors FLOAT, 
+	floors_goal FLOAT, 
+	sleep_avg TIME NOT NULL, 
+	sleep_min TIME NOT NULL, 
+	sleep_max TIME NOT NULL, 
+	rem_sleep_avg TIME NOT NULL, 
+	rem_sleep_min TIME NOT NULL, 
+	rem_sleep_max TIME NOT NULL, 
+	stress_avg INTEGER, 
+	calories_avg INTEGER, 
+	calories_bmr_avg INTEGER, 
+	calories_active_avg INTEGER, 
+	calories_goal INTEGER, 
+	calories_consumed_avg INTEGER, 
+	activities INTEGER, 
+	activities_calories INTEGER, 
+	activities_distance INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_avg INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss_avg INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: joel/garmin_activities.db | TABLE: _attributes ---
+CREATE TABLE _attributes (
+	timestamp DATETIME, 
+	"key" VARCHAR NOT NULL, 
+	value VARCHAR, 
+	PRIMARY KEY ("key")
+)
+
+--- DATABASE: joel/garmin_activities.db | TABLE: activities ---
+CREATE TABLE activities (
+	activity_id VARCHAR NOT NULL, 
+	name VARCHAR, 
+	description VARCHAR, 
+	type VARCHAR, 
+	course_id INTEGER, 
+	laps INTEGER, 
+	sport VARCHAR, 
+	sub_sport VARCHAR, 
+	device_serial_number INTEGER, 
+	self_eval_feel VARCHAR, 
+	self_eval_effort VARCHAR, 
+	training_load FLOAT, 
+	training_effect FLOAT, 
+	anaerobic_training_effect FLOAT, 
+	start_time DATETIME, 
+	stop_time DATETIME, 
+	elapsed_time TIME NOT NULL, 
+	moving_time TIME NOT NULL, 
+	distance FLOAT, 
+	cycles FLOAT, 
+	avg_hr INTEGER, 
+	max_hr INTEGER, 
+	avg_rr FLOAT, 
+	max_rr FLOAT, 
+	calories INTEGER, 
+	avg_cadence INTEGER, 
+	max_cadence INTEGER, 
+	avg_speed FLOAT, 
+	max_speed FLOAT, 
+	avg_power INTEGER, 
+	max_power INTEGER, 
+	normalized_power INTEGER, 
+	threshold_power INTEGER, 
+	ascent FLOAT, 
+	descent FLOAT, 
+	max_temperature FLOAT, 
+	min_temperature FLOAT, 
+	avg_temperature FLOAT, 
+	start_lat FLOAT, 
+	start_long FLOAT, 
+	stop_lat FLOAT, 
+	stop_long FLOAT, 
+	hr_zones_method VARCHAR(18), 
+	hrz_1_hr INTEGER, 
+	hrz_2_hr INTEGER, 
+	hrz_3_hr INTEGER, 
+	hrz_4_hr INTEGER, 
+	hrz_5_hr INTEGER, 
+	hrz_1_time TIME NOT NULL, 
+	hrz_2_time TIME NOT NULL, 
+	hrz_3_time TIME NOT NULL, 
+	hrz_4_time TIME NOT NULL, 
+	hrz_5_time TIME NOT NULL, 
+	PRIMARY KEY (activity_id)
+)
+
+--- DATABASE: joel/garmin_activities.db | TABLE: activities_devices ---
+CREATE TABLE activities_devices (
+	activity_id VARCHAR NOT NULL, 
+	device_serial_number INTEGER NOT NULL, 
+	PRIMARY KEY (activity_id, device_serial_number)
+)
+
+--- DATABASE: joel/garmin_activities.db | TABLE: activity_laps ---
+CREATE TABLE activity_laps (
+	activity_id VARCHAR NOT NULL, 
+	lap INTEGER NOT NULL, 
+	start_time DATETIME, 
+	stop_time DATETIME, 
+	elapsed_time TIME NOT NULL, 
+	moving_time TIME NOT NULL, 
+	distance FLOAT, 
+	cycles FLOAT, 
+	avg_hr INTEGER, 
+	max_hr INTEGER, 
+	avg_rr FLOAT, 
+	max_rr FLOAT, 
+	calories INTEGER, 
+	avg_cadence INTEGER, 
+	max_cadence INTEGER, 
+	avg_speed FLOAT, 
+	max_speed FLOAT, 
+	avg_power INTEGER, 
+	max_power INTEGER, 
+	normalized_power INTEGER, 
+	threshold_power INTEGER, 
+	ascent FLOAT, 
+	descent FLOAT, 
+	max_temperature FLOAT, 
+	min_temperature FLOAT, 
+	avg_temperature FLOAT, 
+	start_lat FLOAT, 
+	start_long FLOAT, 
+	stop_lat FLOAT, 
+	stop_long FLOAT, 
+	hr_zones_method VARCHAR(18), 
+	hrz_1_hr INTEGER, 
+	hrz_2_hr INTEGER, 
+	hrz_3_hr INTEGER, 
+	hrz_4_hr INTEGER, 
+	hrz_5_hr INTEGER, 
+	hrz_1_time TIME NOT NULL, 
+	hrz_2_time TIME NOT NULL, 
+	hrz_3_time TIME NOT NULL, 
+	hrz_4_time TIME NOT NULL, 
+	hrz_5_time TIME NOT NULL, 
+	PRIMARY KEY (activity_id, lap), 
+	FOREIGN KEY(activity_id) REFERENCES activities (activity_id)
+)
+
+--- DATABASE: joel/garmin_activities.db | TABLE: activity_splits ---
+CREATE TABLE activity_splits (
+	activity_id VARCHAR NOT NULL, 
+	split INTEGER NOT NULL, 
+	grade VARCHAR, 
+	completed BOOLEAN, 
+	falls INTEGER, 
+	start_time DATETIME, 
+	stop_time DATETIME, 
+	elapsed_time TIME NOT NULL, 
+	moving_time TIME NOT NULL, 
+	distance FLOAT, 
+	cycles FLOAT, 
+	avg_hr INTEGER, 
+	max_hr INTEGER, 
+	avg_rr FLOAT, 
+	max_rr FLOAT, 
+	calories INTEGER, 
+	avg_cadence INTEGER, 
+	max_cadence INTEGER, 
+	avg_speed FLOAT, 
+	max_speed FLOAT, 
+	avg_power INTEGER, 
+	max_power INTEGER, 
+	normalized_power INTEGER, 
+	threshold_power INTEGER, 
+	ascent FLOAT, 
+	descent FLOAT, 
+	max_temperature FLOAT, 
+	min_temperature FLOAT, 
+	avg_temperature FLOAT, 
+	start_lat FLOAT, 
+	start_long FLOAT, 
+	stop_lat FLOAT, 
+	stop_long FLOAT, 
+	hr_zones_method VARCHAR(18), 
+	hrz_1_hr INTEGER, 
+	hrz_2_hr INTEGER, 
+	hrz_3_hr INTEGER, 
+	hrz_4_hr INTEGER, 
+	hrz_5_hr INTEGER, 
+	hrz_1_time TIME NOT NULL, 
+	hrz_2_time TIME NOT NULL, 
+	hrz_3_time TIME NOT NULL, 
+	hrz_4_time TIME NOT NULL, 
+	hrz_5_time TIME NOT NULL, 
+	PRIMARY KEY (activity_id, split), 
+	FOREIGN KEY(activity_id) REFERENCES activities (activity_id)
+)
+
+--- DATABASE: joel/garmin_activities.db | TABLE: activity_records ---
+CREATE TABLE activity_records (
+	activity_id VARCHAR NOT NULL, 
+	record INTEGER NOT NULL, 
+	timestamp DATETIME, 
+	position_lat FLOAT, 
+	position_long FLOAT, 
+	distance FLOAT, 
+	cadence INTEGER, 
+	altitude FLOAT, 
+	hr INTEGER, 
+	rr FLOAT, 
+	power INTEGER, 
+	speed FLOAT, 
+	temperature FLOAT, 
+	PRIMARY KEY (activity_id, record), 
+	FOREIGN KEY(activity_id) REFERENCES activities (activity_id)
+)
+
+--- DATABASE: joel/garmin_activities.db | TABLE: steps_activities ---
+CREATE TABLE steps_activities (
+	steps INTEGER, 
+	avg_pace TIME NOT NULL, 
+	avg_moving_pace TIME NOT NULL, 
+	max_pace TIME NOT NULL, 
+	avg_steps_per_min INTEGER, 
+	max_steps_per_min INTEGER, 
+	avg_step_length FLOAT, 
+	avg_vertical_ratio FLOAT, 
+	avg_vertical_oscillation FLOAT, 
+	avg_gct_balance FLOAT, 
+	avg_ground_contact_time TIME NOT NULL, 
+	avg_stance_time_percent FLOAT, 
+	vo2_max FLOAT, 
+	activity_id VARCHAR NOT NULL, 
+	PRIMARY KEY (activity_id), 
+	FOREIGN KEY(activity_id) REFERENCES activities (activity_id)
+)
+
+--- DATABASE: joel/garmin_activities.db | TABLE: paddle_activities ---
+CREATE TABLE paddle_activities (
+	strokes INTEGER, 
+	avg_stroke_distance FLOAT, 
+	activity_id VARCHAR NOT NULL, 
+	PRIMARY KEY (activity_id), 
+	FOREIGN KEY(activity_id) REFERENCES activities (activity_id)
+)
+
+--- DATABASE: joel/garmin_activities.db | TABLE: cycle_activities ---
+CREATE TABLE cycle_activities (
+	strokes INTEGER, 
+	vo2_max FLOAT, 
+	activity_id VARCHAR NOT NULL, 
+	PRIMARY KEY (activity_id), 
+	FOREIGN KEY(activity_id) REFERENCES activities (activity_id)
+)
+
+--- DATABASE: joel/garmin_activities.db | TABLE: climbing_activities ---
+CREATE TABLE climbing_activities (
+	total_routes INTEGER, 
+	activity_id VARCHAR NOT NULL, 
+	PRIMARY KEY (activity_id), 
+	FOREIGN KEY(activity_id) REFERENCES activities (activity_id)
+)
+
+--- DATABASE: joel/garmin_summary.db | TABLE: _attributes ---
+CREATE TABLE _attributes (
+	timestamp DATETIME, 
+	"key" VARCHAR NOT NULL, 
+	value VARCHAR, 
+	PRIMARY KEY ("key")
+)
+
+--- DATABASE: joel/garmin_summary.db | TABLE: summary ---
+CREATE TABLE summary (
+	timestamp DATETIME, 
+	"key" VARCHAR NOT NULL, 
+	value VARCHAR, 
+	PRIMARY KEY ("key")
+)
+
+--- DATABASE: joel/garmin_summary.db | TABLE: years_summary ---
+CREATE TABLE years_summary (
+	first_day DATE NOT NULL, 
+	hr_avg FLOAT, 
+	hr_min FLOAT, 
+	hr_max FLOAT, 
+	rhr_avg FLOAT, 
+	rhr_min FLOAT, 
+	rhr_max FLOAT, 
+	inactive_hr_avg FLOAT, 
+	inactive_hr_min FLOAT, 
+	inactive_hr_max FLOAT, 
+	weight_avg FLOAT, 
+	weight_min FLOAT, 
+	weight_max FLOAT, 
+	bmi_avg FLOAT, 
+	body_fat_avg FLOAT, 
+	body_water_avg FLOAT, 
+	bone_mass_avg FLOAT, 
+	muscle_mass_avg FLOAT, 
+	visceral_fat_avg FLOAT, 
+	intensity_time TIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	steps INTEGER, 
+	steps_goal INTEGER, 
+	floors FLOAT, 
+	floors_goal FLOAT, 
+	sleep_avg TIME NOT NULL, 
+	sleep_min TIME NOT NULL, 
+	sleep_max TIME NOT NULL, 
+	rem_sleep_avg TIME NOT NULL, 
+	rem_sleep_min TIME NOT NULL, 
+	rem_sleep_max TIME NOT NULL, 
+	stress_avg INTEGER, 
+	calories_avg INTEGER, 
+	calories_bmr_avg INTEGER, 
+	calories_active_avg INTEGER, 
+	calories_goal INTEGER, 
+	calories_consumed_avg INTEGER, 
+	activities INTEGER, 
+	activities_calories INTEGER, 
+	activities_distance INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_avg INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss_avg INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	PRIMARY KEY (first_day)
+)
+
+--- DATABASE: joel/garmin_summary.db | TABLE: months_summary ---
+CREATE TABLE months_summary (
+	first_day DATE NOT NULL, 
+	hr_avg FLOAT, 
+	hr_min FLOAT, 
+	hr_max FLOAT, 
+	rhr_avg FLOAT, 
+	rhr_min FLOAT, 
+	rhr_max FLOAT, 
+	inactive_hr_avg FLOAT, 
+	inactive_hr_min FLOAT, 
+	inactive_hr_max FLOAT, 
+	weight_avg FLOAT, 
+	weight_min FLOAT, 
+	weight_max FLOAT, 
+	bmi_avg FLOAT, 
+	body_fat_avg FLOAT, 
+	body_water_avg FLOAT, 
+	bone_mass_avg FLOAT, 
+	muscle_mass_avg FLOAT, 
+	visceral_fat_avg FLOAT, 
+	intensity_time TIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	steps INTEGER, 
+	steps_goal INTEGER, 
+	floors FLOAT, 
+	floors_goal FLOAT, 
+	sleep_avg TIME NOT NULL, 
+	sleep_min TIME NOT NULL, 
+	sleep_max TIME NOT NULL, 
+	rem_sleep_avg TIME NOT NULL, 
+	rem_sleep_min TIME NOT NULL, 
+	rem_sleep_max TIME NOT NULL, 
+	stress_avg INTEGER, 
+	calories_avg INTEGER, 
+	calories_bmr_avg INTEGER, 
+	calories_active_avg INTEGER, 
+	calories_goal INTEGER, 
+	calories_consumed_avg INTEGER, 
+	activities INTEGER, 
+	activities_calories INTEGER, 
+	activities_distance INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_avg INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss_avg INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	PRIMARY KEY (first_day)
+)
+
+--- DATABASE: joel/garmin_summary.db | TABLE: weeks_summary ---
+CREATE TABLE weeks_summary (
+	first_day DATE NOT NULL, 
+	hr_avg FLOAT, 
+	hr_min FLOAT, 
+	hr_max FLOAT, 
+	rhr_avg FLOAT, 
+	rhr_min FLOAT, 
+	rhr_max FLOAT, 
+	inactive_hr_avg FLOAT, 
+	inactive_hr_min FLOAT, 
+	inactive_hr_max FLOAT, 
+	weight_avg FLOAT, 
+	weight_min FLOAT, 
+	weight_max FLOAT, 
+	bmi_avg FLOAT, 
+	body_fat_avg FLOAT, 
+	body_water_avg FLOAT, 
+	bone_mass_avg FLOAT, 
+	muscle_mass_avg FLOAT, 
+	visceral_fat_avg FLOAT, 
+	intensity_time TIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	steps INTEGER, 
+	steps_goal INTEGER, 
+	floors FLOAT, 
+	floors_goal FLOAT, 
+	sleep_avg TIME NOT NULL, 
+	sleep_min TIME NOT NULL, 
+	sleep_max TIME NOT NULL, 
+	rem_sleep_avg TIME NOT NULL, 
+	rem_sleep_min TIME NOT NULL, 
+	rem_sleep_max TIME NOT NULL, 
+	stress_avg INTEGER, 
+	calories_avg INTEGER, 
+	calories_bmr_avg INTEGER, 
+	calories_active_avg INTEGER, 
+	calories_goal INTEGER, 
+	calories_consumed_avg INTEGER, 
+	activities INTEGER, 
+	activities_calories INTEGER, 
+	activities_distance INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_avg INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss_avg INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	PRIMARY KEY (first_day)
+)
+
+--- DATABASE: joel/garmin_summary.db | TABLE: days_summary ---
+CREATE TABLE days_summary (
+	day DATE NOT NULL, 
+	hr_avg FLOAT, 
+	hr_min FLOAT, 
+	hr_max FLOAT, 
+	rhr_avg FLOAT, 
+	rhr_min FLOAT, 
+	rhr_max FLOAT, 
+	inactive_hr_avg FLOAT, 
+	inactive_hr_min FLOAT, 
+	inactive_hr_max FLOAT, 
+	weight_avg FLOAT, 
+	weight_min FLOAT, 
+	weight_max FLOAT, 
+	bmi_avg FLOAT, 
+	body_fat_avg FLOAT, 
+	body_water_avg FLOAT, 
+	bone_mass_avg FLOAT, 
+	muscle_mass_avg FLOAT, 
+	visceral_fat_avg FLOAT, 
+	intensity_time TIME NOT NULL, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	steps INTEGER, 
+	steps_goal INTEGER, 
+	floors FLOAT, 
+	floors_goal FLOAT, 
+	sleep_avg TIME NOT NULL, 
+	sleep_min TIME NOT NULL, 
+	sleep_max TIME NOT NULL, 
+	rem_sleep_avg TIME NOT NULL, 
+	rem_sleep_min TIME NOT NULL, 
+	rem_sleep_max TIME NOT NULL, 
+	stress_avg INTEGER, 
+	calories_avg INTEGER, 
+	calories_bmr_avg INTEGER, 
+	calories_active_avg INTEGER, 
+	calories_goal INTEGER, 
+	calories_consumed_avg INTEGER, 
+	activities INTEGER, 
+	activities_calories INTEGER, 
+	activities_distance INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_avg INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss_avg INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: joel/garmin_summary.db | TABLE: intensity_hr ---
+CREATE TABLE intensity_hr (
+	timestamp DATETIME NOT NULL, 
+	intensity INTEGER NOT NULL, 
+	heart_rate INTEGER NOT NULL, 
+	PRIMARY KEY (timestamp)
+)
+
+--- DATABASE: joel/garmin.db | TABLE: _attributes ---
+CREATE TABLE _attributes (
+	timestamp DATETIME, 
+	"key" VARCHAR NOT NULL, 
+	value VARCHAR, 
+	PRIMARY KEY ("key")
+)
+
+--- DATABASE: joel/garmin.db | TABLE: attributes ---
+CREATE TABLE attributes (
+	timestamp DATETIME, 
+	"key" VARCHAR NOT NULL, 
+	value VARCHAR, 
+	PRIMARY KEY ("key")
+)
+
+--- DATABASE: joel/garmin.db | TABLE: devices ---
+CREATE TABLE devices (
+	serial_number INTEGER NOT NULL, 
+	timestamp DATETIME, 
+	device_type VARCHAR, 
+	manufacturer VARCHAR(28), 
+	product VARCHAR, 
+	hardware_version VARCHAR, 
+	PRIMARY KEY (serial_number)
+)
+
+--- DATABASE: joel/garmin.db | TABLE: weight ---
+CREATE TABLE weight (
+	day DATE NOT NULL, 
+	weight FLOAT NOT NULL, 
+	bmi FLOAT, 
+	body_fat FLOAT, 
+	body_water FLOAT, 
+	bone_mass FLOAT, 
+	muscle_mass FLOAT, 
+	visceral_fat FLOAT, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: joel/garmin.db | TABLE: stress ---
+CREATE TABLE stress (
+	timestamp DATETIME NOT NULL, 
+	stress INTEGER NOT NULL, 
+	PRIMARY KEY (timestamp), 
+	UNIQUE (timestamp)
+)
+
+--- DATABASE: joel/garmin.db | TABLE: sleep ---
+CREATE TABLE sleep (
+	day DATE NOT NULL, 
+	start DATETIME, 
+	"end" DATETIME, 
+	total_sleep TIME NOT NULL, 
+	deep_sleep TIME NOT NULL, 
+	light_sleep TIME NOT NULL, 
+	rem_sleep TIME NOT NULL, 
+	awake TIME NOT NULL, 
+	avg_spo2 FLOAT, 
+	avg_rr FLOAT, 
+	avg_stress FLOAT, 
+	score INTEGER, 
+	qualifier VARCHAR, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: joel/garmin.db | TABLE: sleep_events ---
+CREATE TABLE sleep_events (
+	timestamp DATETIME NOT NULL, 
+	event VARCHAR, 
+	duration TIME NOT NULL, 
+	PRIMARY KEY (timestamp)
+)
+
+--- DATABASE: joel/garmin.db | TABLE: resting_hr ---
+CREATE TABLE resting_hr (
+	day DATE NOT NULL, 
+	resting_heart_rate FLOAT, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: joel/garmin.db | TABLE: hrv ---
+CREATE TABLE hrv (
+	day DATE NOT NULL, 
+	weekly_avg INTEGER, 
+	last_night_avg INTEGER, 
+	last_night_5min_high INTEGER, 
+	baseline_low INTEGER, 
+	baseline_upper INTEGER, 
+	status VARCHAR, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: joel/garmin.db | TABLE: daily_summary ---
+CREATE TABLE daily_summary (
+	day DATE NOT NULL, 
+	hr_min INTEGER, 
+	hr_max INTEGER, 
+	rhr INTEGER, 
+	stress_avg INTEGER, 
+	step_goal INTEGER, 
+	steps INTEGER, 
+	moderate_activity_time TIME NOT NULL, 
+	vigorous_activity_time TIME NOT NULL, 
+	intensity_time_goal TIME NOT NULL, 
+	floors_up FLOAT, 
+	floors_down FLOAT, 
+	floors_goal FLOAT, 
+	distance FLOAT, 
+	calories_goal INTEGER, 
+	calories_total INTEGER, 
+	calories_bmr INTEGER, 
+	calories_active INTEGER, 
+	calories_consumed INTEGER, 
+	hydration_goal INTEGER, 
+	hydration_intake INTEGER, 
+	sweat_loss INTEGER, 
+	spo2_avg FLOAT, 
+	spo2_min FLOAT, 
+	rr_waking_avg FLOAT, 
+	rr_max FLOAT, 
+	rr_min FLOAT, 
+	bb_charged INTEGER, 
+	bb_max INTEGER, 
+	bb_min INTEGER, 
+	description VARCHAR, 
+	PRIMARY KEY (day)
+)
+
+--- DATABASE: joel/garmin.db | TABLE: files ---
+CREATE TABLE files (
+	id VARCHAR NOT NULL, 
+	name VARCHAR, 
+	type VARCHAR(28) NOT NULL, 
+	serial_number INTEGER, 
+	PRIMARY KEY (id), 
+	UNIQUE (name), 
+	FOREIGN KEY(serial_number) REFERENCES devices (serial_number)
+)
+
+--- DATABASE: joel/garmin.db | TABLE: device_info ---
+CREATE TABLE device_info (
+	timestamp DATETIME NOT NULL, 
+	file_id VARCHAR, 
+	serial_number INTEGER NOT NULL, 
+	software_version VARCHAR, 
+	cum_operating_time TIME NOT NULL, 
+	battery_status VARCHAR(8), 
+	battery_voltage FLOAT, 
+	PRIMARY KEY (timestamp, serial_number), 
+	FOREIGN KEY(file_id) REFERENCES files (id), 
+	FOREIGN KEY(serial_number) REFERENCES devices (serial_number)
+)
+
