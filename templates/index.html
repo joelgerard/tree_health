@@ -499,6 +499,25 @@
                 </div>
                 {% endif %}
             </div>
+<!-- Metric 6: Inflammation (Temp) -->
+<div class="col-md-6 col-lg-3">
+    <div class="metric-card p-4 h-100">
+        <div class="d-flex justify-content-between mb-3">
+            <small class="text-secondary">Inflammation (Temp)</small>
+            <div class="status-indicator status-{{ metrics.oura.status }}"></div>
+        </div>
+        <h5 class="card-title fw-normal mb-1 {{ 'text-' + metrics.oura.status }}">
+            {{ metrics.oura.msg }}
+        </h5>
+        {% if metrics.oura.temp_deviation is not none %}
+        <p class="text-secondary small mt-2 mb-0">
+            {{ '%+0.2f' % metrics.oura.temp_deviation }}°C Deviation
+        </p>
+        {% else %}
+        <p class="text-secondary small mt-2 mb-0">Oura Data Unavailable</p>
+        {% endif %}
+    </div>
+</div>
         </div>
 
         <!-- Verdict Banner -->
@@ -522,7 +541,7 @@
 
                     <div class="row g-0 align-items-center text-center">
                         <!-- 1. Body Battery -->
-                        <div class="col-3 border-end border-secondary border-opacity-10">
+                        <div class="col border-end border-secondary border-opacity-10">
                             <div class="text-secondary small mb-1">Body Battery</div>
                             <div class="h3 fw-bold mb-0">{{ trends.batt.val }}%</div>
                             <div class="d-flex gap-2 justify-content-center mt-2" style="font-size: 0.75rem;">
@@ -543,7 +562,7 @@
                             </div>
                         </div>
                         <!-- 2. HRV -->
-                        <div class="col-3 border-end border-secondary border-opacity-10">
+                        <div class="col border-end border-secondary border-opacity-10">
                             <div class="text-secondary small mb-1">HRV (Avg)</div>
                             <div class="h3 fw-bold mb-0 text-success">{{ trends.hrv.val }} <small
                                     class="text-secondary fs-6">ms</small></div>
@@ -566,7 +585,7 @@
                         </div>
 
                         <!-- 3. RHR -->
-                        <div class="col-3 border-end border-secondary border-opacity-10">
+                        <div class="col border-end border-secondary border-opacity-10">
                             <div class="text-secondary small mb-1">Resting HR</div>
                             <div class="h3 fw-bold mb-0">{{ trends.rhr.val }} <small
                                     class="text-secondary fs-6">bpm</small></div>
@@ -589,7 +608,8 @@
                         </div>
 
                         <!-- 4. Stress -->
-                        <div class="col-3">
+                        <!-- 4. Stress -->
+                        <div class="col border-end border-secondary border-opacity-10">
                             <div class="text-secondary small mb-1">Stress (Avg)</div>
                             <div class="h3 fw-bold mb-0">{{ trends.stress.val }}</div>
                             <div class="d-flex gap-2 justify-content-center mt-2" style="font-size: 0.75rem;">
@@ -609,6 +629,26 @@
                                 </div>
                             </div>
                         </div>
+<!-- 5. Temp -->
+<div class="col">
+    <div class="text-secondary small mb-1">Temp (3d)</div>
+    <div class="h3 fw-bold mb-0 text-{{ trends.temp.status }}">
+        {% if trends.temp.val is not none %}
+        {{ '%+0.2f' % trends.temp.trend_3d }}
+        {% else %}
+        --
+        {% endif %}
+        <small class="text-secondary fs-6">°C</small>
+    </div>
+    <div class="d-flex gap-2 justify-content-center mt-2" style="font-size: 0.75rem;">
+        <div>
+            <span class="text-secondary opacity-75">Trend</span>
+            <span class="text-{{ trends.temp.status }} fw-bold">
+                {{ trends.temp.status }}
+            </span>
+        </div>
+    </div>
+</div>
                     </div>
                 </div>
             </div>
@@ -730,6 +770,18 @@
                                 line: { color: '#1abc9c', width: 2 }
                             };
 
+                            const traceTemp = {
+                                x: data.dates,
+                                y: data.body_temp,
+                                name: 'Body Temp (C)',
+                                yaxis: 'y2',
+                                type: 'scatter',
+                                mode: 'lines',
+                                visible: true,
+                                line: { color: '#e67e22', width: 2, dash: 'dot' },
+                                hovertemplate: '%{y:.2f}°C<extra></extra>'
+                            };
+
                             const layout1 = {
                                 title: { text: '', font: { color: '#2c3e50' } },
                                 paper_bgcolor: 'rgba(0,0,0,0)',
@@ -748,7 +800,7 @@
                                 }
                             };
 
-                            Plotly.newPlot('trendChart', [traceSteps, traceBatt, traceBattGain, traceRHR, traceStress, traceHRV], layout1, { responsive: true, displayModeBar: false });
+                            Plotly.newPlot('trendChart', [traceSteps, traceBatt, traceBattGain, traceRHR, traceStress, traceHRV, traceTemp], layout1, { responsive: true, displayModeBar: false });
 
                             // CHART 2: Metabolic Health
                             const traceCost = {

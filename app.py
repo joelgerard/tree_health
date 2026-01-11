@@ -400,6 +400,7 @@ def get_trend_data(conn, target_date=None, days=7):
         "batt": {"trend_7d": 0, "trend_3d": 0, "val": 0},
         "stress": {"trend_7d": 0, "trend_3d": 0, "val": 0},
         "hrv": {"trend_7d": 0, "trend_3d": 0, "val": 0},
+        "temp": {"val": 0, "trend_3d": 0, "status": "GRAY"},
         "recent_costs": []
     }
     
@@ -421,11 +422,15 @@ def get_trend_data(conn, target_date=None, days=7):
     except Exception as e:
         print(f"Error fetching HRV trend data: {e}")
         hrv_map = {}
+
+    temp_map = get_oura_temp_data(end_date.isoformat(), days=days)
         
     # Helper for safe access
     def get_val(r, key):
         if key == 'hrv':
             return hrv_map.get(r['day'], 0)
+        elif key == 'temp':
+            return temp_map.get(r['day'], 0)
         return r[key] if r and r[key] is not None else 0
 
     # 1. 7-Day Trend (Diff of Avgs)
@@ -452,6 +457,37 @@ def get_trend_data(conn, target_date=None, days=7):
         hrv_recent = sum([get_val(r, 'hrv') for r in recent_rows]) / 3
         hrv_old = sum([get_val(r, 'hrv') for r in old_rows]) / 3
         trends['hrv']['trend_7d'] = round(hrv_recent - hrv_old, 1)
+
+        # Temp Trend (Using the "Avg Recent 3 - Avg Old 3" logic as requested for 'trend_3d')
+        # User requested: "trend_3d: The average of the last 3 days minus the average of the 3 days before that."
+        # This matches the logic we use for 'trend_7d' here (recent 3 vs old 3 in a 6-day window).
+        # We will store it in 'trend_3d' key as requested.
+        temp_recent = sum([get_val(r, 'temp') for r in recent_rows]) / 3
+        temp_old = sum([get_val(r, 'temp') for r in old_rows]) / 3
+        temp_trend = round(temp_recent - temp_old, 2)
+        trends['temp']['trend_3d'] = temp_trend
+        
+        # Status Logic
+        # - Negative (e.g. -0.2): GREEN (Cooling)
+        # - Positive (> +0.1): YELLOW (Warming)
+        # - High (> +0.4): RED (Inflamed)
+        # Status Logic
+        # - Negative (e.g. -0.2): GREEN (Cooling)
+        # - Positive (> +0.1): YELLOW (Warming)
+        # - High (> +0.4): RED (Inflamed) - User prompt said "SPIKING" for Red.
+        if temp_trend > 0.4:
+            trends['temp']['status'] = "RED" # SPIKING
+        elif temp_trend > 0: # User said Positive (> +0.1) for Yellow, but "Negative" for Green. What about 0 to 0.1? Let's assume > 0 is Warming.
+             # Actually prompt said: "If trend_3d is Positive (> +0.1): Status YELLOW (Warming)."
+             # And "If trend_3d is Negative (e.g., -0.2): Status GREEN (Cooling)."
+             # So 0.0 to 0.1 is... GRAY? Or Green? Let's stick to strict prompt if possible.
+             # Let's say <= 0.1 is Green/Neutral.
+            if temp_trend > 0.1:
+                trends['temp']['status'] = "YELLOW" # WARMING
+            else:
+                trends['temp']['status'] = "GREEN" # COOLING (or Stable)
+        else:
+             trends['temp']['status'] = "GREEN" # COOLING
         
     # 2. 3-Day Trend (Today - 3 Days Ago)
     if len(rows) > 3:
@@ -467,6 +503,7 @@ def get_trend_data(conn, target_date=None, days=7):
     trends['batt']['val'] = get_val(rows[0], 'bb_max')
     trends['stress']['val'] = get_val(rows[0], 'stress_avg')
     trends['hrv']['val'] = get_val(rows[0], 'hrv')
+    trends['temp']['val'] = get_val(rows[0], 'temp')
 
     # 3. Efficiency Costs (Last 3 Days)
     # Indices 0, 1, 2
@@ -619,6 +656,25 @@ def calculate_metrics(target_date, conn, conn_activities):
         elif physio_cost_t1 > 150 and val_bb_min_t1 < 40:
              red_flags.append(f"High Metabolic Tax (Cost: {int(physio_cost_t1)})")
 
+    # --- LOGIC GATE 4: OURA TEMPERATURE (Inflammation) ---
+    temp_data = get_oura_temp_data(target_date, days=1)
+    temp_dev = temp_data.get(target_date)
+    
+    # Store for UI usage
+    metrics_extra = {"temp_dev": temp_dev}
+    
+    if temp_dev is not None:
+        if temp_dev > 0.5:
+            red_flags.append(f"Inflammation Spike (+{temp_dev}°C)")
+        elif temp_dev > 0.3:
+            warnings.append(f"Elevated Temp (+{temp_dev}°C)")
+        elif temp_dev < 0:
+            # Good sign, but maybe verify context? user asked for Green Status "Cooling/Restoring"
+            # We don't usually append green flags to warnings/red_flags lists unless we have a 'green_flags' list or similar.
+            # But the 'reason' string construction logic below handles RED/YELLOW/GREEN primarily based on flags.
+            # If we want to explicitly show "Cooling" in the REASON if it's green, we can do it there.
+            pass
+
     # --- LOGIC GATE 5: PHYSIOLOGICAL COST (The Efficiency Check) ---
     # Metric: Active Calories per 1,000 steps
     # Baseline: ~29.0. Warning Threshold: +20% (34.8)
@@ -673,7 +729,8 @@ def calculate_metrics(target_date, conn, conn_activities):
         "status": status,
         "reason": reason,
         "target_steps": target_steps,
-        "metrics": {"rhr": rhr, "bb": bb_charged, "physio_cost": physio_cost, "steps": steps}
+        "target_steps": target_steps,
+        "metrics": {"rhr": rhr, "bb": bb_charged, "physio_cost": physio_cost, "steps": steps, "temp_dev": temp_dev}
     }
 
 def get_oura_data(date_str):
@@ -702,6 +759,33 @@ def get_oura_data(date_str):
         print(f"Error fetching Oura data: {e}")
         
     return None
+
+def get_oura_temp_data(target_date, days=1):
+    """
+    Fetch temperature_deviation for a single date or a history range.
+    Returns: dictionary {date_str: deviation_value}
+    """
+    if not os.path.exists(OURA_DB):
+        return {}
+        
+    try:
+        conn = sqlite3.connect(OURA_DB)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        if days == 1:
+            cursor.execute("SELECT day, temperature_deviation FROM daily_readiness WHERE day = ?", (target_date,))
+        else:
+            start_date = (datetime.strptime(target_date, '%Y-%m-%d') - timedelta(days=days-1)).strftime('%Y-%m-%d')
+            cursor.execute("SELECT day, temperature_deviation FROM daily_readiness WHERE day BETWEEN ? AND ? ORDER BY day DESC", (start_date, target_date))
+            
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return {row['day']: row['temperature_deviation'] for row in rows if row['temperature_deviation'] is not None}
+    except Exception as e:
+        print(f"Error fetching Oura temp data: {e}")
+        return {}
 
 def get_dashboard_context(date_str):
     """
@@ -735,6 +819,7 @@ def get_dashboard_context(date_str):
             "batt": {"trend_7d": 0, "trend_3d": 0, "val": 0},
             "stress": {"trend_7d": 0, "trend_3d": 0, "val": 0},
             "hrv": {"trend_7d": 0, "trend_3d": 0, "val": 0},
+            "temp": {"val": 0, "trend_3d": 0, "status": "GRAY"},
             "recent_costs": []
         }
         
@@ -812,6 +897,23 @@ def get_dashboard_context(date_str):
         # Keep raw metrics access if needed
         "_raw": metrics_raw['metrics']
     }
+
+    # Add Oura status for UI consistency
+    if metrics['oura'] and metrics['oura'].get('temp_deviation') is not None:
+        temp = metrics['oura']['temp_deviation']
+        if temp > 0.5:
+            metrics['oura']['status'] = "RED"
+            metrics['oura']['msg'] = "High Deviation"
+        elif temp < 0:
+            metrics['oura']['status'] = "GREEN"
+            metrics['oura']['msg'] = "Stable (Cool)"
+        else:
+            metrics['oura']['status'] = "YELLOW"
+            metrics['oura']['msg'] = "Moderate Rise"
+    else:
+        metrics['oura'] = metrics.get('oura') or {}
+        metrics['oura']['status'] = "GRAY"
+        metrics['oura']['msg'] = "No Data"
 
     daily_status = metrics['final_verdict']['status']
     
@@ -924,18 +1026,28 @@ def format_dashboard_report(context):
     lines.append(status_line("Autonomic Stress", m['autonomic_stress']))
     lines.append(status_line("Sleep Recharge", m['sleep_recharge']))
     lines.append(status_line("Efficiency Check", m['efficiency_check']))
+    lines.append(status_line("Efficiency Check", m['efficiency_check']))
     lines.append(f"  Physio Cost          [{m['physio_cost']['status']}] {m['physio_cost']['val']} Cals/1k ({m['physio_cost']['msg']})")
     
     # Oura Inflammation
-    if context.get('oura') and context['oura'].get('temp_deviation') is not None:
-        temp = context['oura']['temp_deviation']
+    if m.get('_raw') and m['_raw'].get('temp_dev') is not None:
+        temp = m['_raw']['temp_dev']
+        # Recalculate status for report just to be safe or map from flags?
+        # Logic: > 0.5 RED, > 0.3 YELLOW, < 0 GREEN
         if temp > 0.5:
             temp_status = "[RED]"
+            temp_msg = "Inflammation Spike"
+        elif temp > 0.3:
+            temp_status = "[YELLOW]"
+            temp_msg = "Elevated Temp"
         elif temp < 0:
             temp_status = "[GREEN]"
+            temp_msg = "Cooling/Restoring"
         else:
-            temp_status = "[YELLOW]"
-        lines.append(f"  Inflammation (Temp)  {temp_status} {temp}°C")
+            temp_status = "[YELLOW]" # 0.0 to 0.3 range - Stable/Mild?
+            temp_msg = "Stable"
+            
+        lines.append(f"  Inflammation (Temp)  {temp_status} {temp:+.2f}°C ({temp_msg})")
         
     lines.append("")
 
@@ -951,6 +1063,22 @@ def format_dashboard_report(context):
     lines.append(trend_line("HRV (Avg)", t['hrv'], "ms"))
     lines.append(trend_line("Resting HR", t['rhr'], "bp"))
     lines.append(trend_line("Stress", t['stress'], "  "))
+    
+    # Temp Trend Line
+    # Temp Velocity       [VALUE]°C ({STATUS})
+    # Status Mapping: YELLOW -> WARMING, RED -> SPIKING, GREEN -> COOLING
+    status_label = "COOLING"
+    if t.get('temp'):
+        ts = t['temp'].get('status')
+        if ts == "YELLOW": status_label = "WARMING"
+        elif ts == "RED": status_label = "SPIKING"
+        
+        if t['temp'].get('trend_3d') is not None:
+            trend_val = t['temp']['trend_3d']
+            lines.append(f"  Temp Velocity  {trend_val:>+6.2f}°C ({status_label})")
+        else:
+            lines.append(f"  Temp Velocity   --.--°C ({status_label})")
+    
     lines.append("")
     
     lines.append("Efficiency Report (Last 3 Days):")
@@ -1079,13 +1207,25 @@ def get_time_series_data(target_date):
         "batt_gain": [],
         "cost": [],
         "active_cals": [],
-        "hrv": []
+        "hrv": [],
+        "body_temp": []
     }
     
     try:
         conn = get_db_connection(GARMIN_DB)
         cursor = conn.cursor()
         
+        # Oura Connection
+        conn_oura = None
+        cursor_oura = None
+        if os.path.exists(OURA_DB):
+            try:
+                conn_oura = sqlite3.connect(OURA_DB)
+                conn_oura.row_factory = sqlite3.Row
+                cursor_oura = conn_oura.cursor()
+            except Exception as e:
+                print(f"Error connecting to Oura DB: {e}")
+
         current = start_date
         while current <= end_date:
             date_str = current.isoformat()
@@ -1141,9 +1281,24 @@ def get_time_series_data(target_date):
             hrv = row_hrv['last_night_avg'] if row_hrv else None
             data["hrv"].append(hrv)
 
+            # Body Temperature (Oura)
+            body_temp = None
+            if cursor_oura:
+                try:
+                    cursor_oura.execute("SELECT temperature_deviation FROM daily_readiness WHERE day = ?", (date_str,))
+                    row_oura = cursor_oura.fetchone()
+                    if row_oura and row_oura['temperature_deviation'] is not None:
+                        # Baseline 36.6 C + deviation
+                        body_temp = round(36.6 + row_oura['temperature_deviation'], 2)
+                except Exception:
+                    pass
+            data["body_temp"].append(body_temp)
+
             current += timedelta(days=1)
             
         conn.close()
+        if conn_oura:
+            conn_oura.close()
     except Exception as e:
         print(f"Error fetching time series data: {e}")
         
