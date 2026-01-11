@@ -38,6 +38,14 @@ class TestLogicEngine(unittest.TestCase):
         # Query: SELECT total_sleep FROM sleep ...
         sleep_row = {'total_sleep': sleep_data} if sleep_data else None
 
+        # 4. T-1 Data (New Requirement)
+        # Query: SELECT steps, calories_active, bb_min FROM daily_summary WHERE day = ? (Checking T-1)
+        t1_row = {
+            'steps': day_data.get('steps_t1', 0),
+            'calories_active': day_data.get('cals_t1', 0),
+            'bb_min': day_data.get('bb_min_t1', 100)
+        }
+
         # 3. T-2 Data
         # Query: SELECT steps, hr_max, stress_avg FROM daily_summary ... (Checking T-2)
         # Note: We need to update app.py to fetch stress_avg for T-2 first
@@ -49,11 +57,12 @@ class TestLogicEngine(unittest.TestCase):
 
         # Determine side_effect based on calls
         # We need to match the order of calls in calculate_metrics
-        # 1. Main Data
-        # 2. Sleep Data (We will add this)
-        # 3. T-2 Data
+        # 1. Main Data (line 518)
+        # 2. Sleep Data (line 522)
+        # 3. T-2 Data (line 578)
+        # 4. T-1 Data (line 606)
         
-        self.cursor.fetchone.side_effect = [main_row, sleep_row, t2_row]
+        self.cursor.fetchone.side_effect = [main_row, sleep_row, t2_row, t1_row]
 
     def test_sensory_load_flag(self):
         # Steps < 1000 AND Stress > 35 -> HIGH RISK

@@ -22,9 +22,8 @@ else:
 
 GARMIN_DB = os.path.join(DB_DIR, "garmin.db")
 GARMIN_ACTIVITIES_DB = os.path.join(DB_DIR, "garmin_activities.db")
-GARMIN_HRV_DB = os.path.join(DB_DIR, "garmin_hrv.db")
 OURA_DB = os.path.join(DB_DIR, "oura.db")
-# Note: HRV data is now expected in garmin.db (Legacy comment?)
+# Note: HRV data is sourced from garmin.db
 SYNC_SCRIPT = os.path.expanduser("/Users/joelgerard/tree_home/export_garmin.sh")
 
 # --- DYNAMIC CONFIGURATION ---
