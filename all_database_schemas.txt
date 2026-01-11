@@ -2029,3 +2029,19 @@ CREATE TABLE device_info (
 	FOREIGN KEY(serial_number) REFERENCES devices (serial_number)
 )
 
+
+--- DATABASE: tree/glucose.db | TABLE: glucose_readings ---
+CREATE TABLE glucose_readings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            idx INTEGER,
+            timestamp DATETIME,
+            event_type TEXT,
+            event_subtype TEXT,
+            glucose_value REAL,
+            insulin_value REAL,
+            carb_value REAL,
+            duration TEXT,
+            rate_of_change REAL,
+            transmitter_time INTEGER,
+            transmitter_id TEXT
+        );
