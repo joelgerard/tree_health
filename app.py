@@ -914,6 +914,7 @@ def get_dashboard_context(date_str):
         metrics['oura'] = metrics.get('oura') or {}
         metrics['oura']['status'] = "GRAY"
         metrics['oura']['msg'] = "No Data"
+        metrics['oura']['temp_deviation'] = None
 
     daily_status = metrics['final_verdict']['status']
     
